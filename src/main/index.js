@@ -47,7 +47,7 @@ app.commandLine.appendSwitch('disable-features', 'DnsOverHttps')
 
 const login_width = 300
 const login_height = 370
-const register_height = 490
+const register_height = 550
 
 function createWindow() {
   // Create the browser window.

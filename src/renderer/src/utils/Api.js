@@ -4,6 +4,7 @@ const api = {
   prodWsDomain: 'ws://127.0.0.1:5051/ws',
   devWsDomain: 'ws://127.0.0.1:5051/ws',
   checkCode: '/account/checkCode', //验证码
+  registerEmailCode: '/account/registerEmailCode', //注册邮箱验证码
   login: '/account/login', //登录
   register: '/account/register', //注册
   getSysSetting: '/account/getSysSetting',

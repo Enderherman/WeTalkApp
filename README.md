@@ -24,6 +24,10 @@ npm run dev
 
 开发环境 API 与 WebSocket 地址在应用配置中设置。浏览器版 WeTalkWeb 是独立客户端，不通过 Electron 启动。
 
+## 账号注册与 AI
+
+注册使用邮箱验证码：先完成图片验证码并请求邮件验证码，再填写邮件中的 6 位验证码创建账号。App 不保存 SMTP 或 DeepSeek 凭据；邮箱发送和 AI 提供商均由共享 WeTalk 后端配置，AI 使用 DeepSeek 时由后端读取私有环境变量。
+
 ## 构建桌面安装包
 
 ```bash

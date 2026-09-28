@@ -16,6 +16,7 @@
               placeholder="请输入邮箱"
               maxLength="30"
               v-model.trim="formData.email"
+              @change="formData.emailCode = ''"
               @focus="cleanVerify"
             >
               <template #prefix>
@@ -99,6 +100,30 @@
             <img :src="checkCodeUrl" class="check-code" alt="验证码" @click="changeCheckCode(0)" />
           </div>
         </el-form-item>
+        <!--注册邮箱验证码-->
+        <el-form-item v-if="!isLogin" label="" prop="emailCode">
+          <div class="check-code-panel">
+            <el-input
+              size="large"
+              clearable
+              maxlength="6"
+              inputmode="numeric"
+              autocomplete="one-time-code"
+              placeholder="请输入邮箱验证码"
+              v-model.trim="formData.emailCode"
+              @focus="cleanVerify"
+            >
+              <template #prefix>
+                <span class="iconfont icon-email"></span>
+              </template>
+            </el-input>
+            <el-button
+              native-type="button"
+              :disabled="emailCodeSending || emailCodeCountdown > 0"
+              @click="sendRegistrationEmailCode"
+            >{{ emailCodeSending ? '发送中…' : emailCodeCountdown > 0 ? `${emailCodeCountdown} 秒后重发` : '发送验证码' }}</el-button>
+          </div>
+        </el-form-item>
         <!--按钮-->
         <el-form-item>
           <el-button type="primary" class="login-btn" @click="submit"
@@ -137,12 +162,16 @@ const formDataRef = ref()
 
 const errorMsg = ref(null)
 const isLogin = ref(true)
+const emailCodeSending = ref(false)
+const emailCodeCountdown = ref(0)
+let emailCodeTimer = null
 
 //加载页面
 const showLoading = ref(false)
 
 //切换登录或注册界面
 const changeOpType = () => {
+  stopEmailCodeCountdown()
   window.ipcRenderer.send('loginOrRegister', !isLogin.value)
   isLogin.value = !isLogin.value
   nextTick(() => {
@@ -151,6 +180,24 @@ const changeOpType = () => {
     cleanVerify()
   })
   changeCheckCode()
+}
+
+const stopEmailCodeCountdown = () => {
+  if (emailCodeTimer) clearInterval(emailCodeTimer)
+  emailCodeTimer = null
+  emailCodeCountdown.value = 0
+}
+
+const startEmailCodeCountdown = () => {
+  stopEmailCodeCountdown()
+  emailCodeCountdown.value = 60
+  emailCodeTimer = setInterval(() => {
+    if (emailCodeCountdown.value <= 1) {
+      stopEmailCodeCountdown()
+      return
+    }
+    emailCodeCountdown.value -= 1
+  }, 1000)
 }
 
 /**
@@ -169,6 +216,48 @@ const changeCheckCode = async () => {
   localStorage.setItem('check_code_key', result.data.check_code_key)
 }
 changeCheckCode()
+
+const sendRegistrationEmailCode = async () => {
+  cleanVerify()
+  if (!checkValue('checkEmail', formData.value.email, '请输入正确的邮箱')) return
+  if (!checkValue(null, formData.value.checkCode, '请输入图片验证码')) return
+
+  const checkCodeKey = localStorage.getItem('check_code_key')
+  if (!checkCodeKey) {
+    errorMsg.value = '图片验证码已过期，请刷新后重试'
+    await changeCheckCode()
+    return
+  }
+
+  emailCodeSending.value = true
+  let result = null
+  try {
+    result = await Request({
+      url: Api.registerEmailCode,
+      showLoading: false,
+      showError: false,
+      params: {
+        email: formData.value.email,
+        checkCode: formData.value.checkCode,
+        checkCodeKey
+      },
+      errorCallback: (response) => {
+        errorMsg.value = response.message
+        Message.error(response.message)
+      }
+    })
+  } catch {
+    errorMsg.value = '验证码发送失败，请稍后重试'
+  } finally {
+    emailCodeSending.value = false
+    formData.value.checkCode = ''
+    await changeCheckCode()
+  }
+  if (!result) return
+
+  Message.success('如果邮箱可以注册，验证码已发送，请查收')
+  startEmailCodeCountdown()
+}
 
 /**
  * 校验参数
@@ -215,7 +304,10 @@ const submit = async () => {
     return
   }
 
-  if (!checkValue(null, formData.value.checkCode, '请输入验证码')) {
+  if (isLogin.value) {
+    if (!checkValue(null, formData.value.checkCode, '请输入验证码')) return
+  } else if (!/^\d{6}$/.test(formData.value.emailCode || '')) {
+    errorMsg.value = '请输入 6 位邮箱验证码'
     return
   }
 
@@ -226,17 +318,25 @@ const submit = async () => {
   /**
    * 请求统一发送
    */
+  const params = isLogin.value
+    ? {
+        email: formData.value.email,
+        password: md5(formData.value.password),
+        checkCode: formData.value.checkCode,
+        checkCodeKey: localStorage.getItem('check_code_key')
+      }
+    : {
+        email: formData.value.email,
+        password: formData.value.password,
+        nickName: formData.value.nickName,
+        emailCode: formData.value.emailCode
+      }
+
   let result = await Request({
     url: isLogin.value ? Api.login : Api.register,
     showLoading: !isLogin.value,
     showError: false,
-    params: {
-      email: formData.value.email,
-      password: isLogin.value ? md5(formData.value.password) : formData.value.password,
-      checkCode: formData.value.checkCode,
-      nickName: isLogin.value ? null : formData.value.nickName,
-      checkCodeKey: localStorage.getItem('check_code_key')
-    },
+    params,
     errorCallback: (response) => {
       showLoading.value = false
       //刷新验证码
@@ -300,6 +400,7 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  stopEmailCodeCountdown()
   window.ipcRenderer.removeAllListeners('loadLocalUserCallback')
 })
 </script>
