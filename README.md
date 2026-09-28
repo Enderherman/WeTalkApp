@@ -1,5 +1,11 @@
 # WeTalkApp
 
+## 本轮功能：联系人邮箱与昵称搜索（2026-09-29）
+
+- 添加联系人可使用邮箱精确找人，也支持用户昵称和群昵称模糊搜索；多个匹配项会以列表显示并可逐个选择。
+- 桌面端通过后端 `/contact/searchByKeyword`，与 WeTalkWeb 使用同一套结果和关系状态。
+- 验证：后端 Maven `clean verify` 106 项通过，WeTalkWeb 265 项单测/类型检查/生产构建通过，WeTalkApp 生产构建通过。
+
 ## NAS API 与 WebSocket 接入
 
 设置 `RENDERER_VITE_WETALK_SERVER_ORIGIN` 和 `RENDERER_VITE_WETALK_WS_ORIGIN` 后再构建，即可把桌面客户端指向 NAS。打包版启动一个只绑定 `127.0.0.1` 临时端口的本地服务：它提供渲染页面并把 `/api` 请求按流转发到配置的后端 origin，因此渲染页保持同源且继续启用 Electron `webSecurity`。WebSocket 由 Electron 主进程直接连接配置的 NAS 地址；管理员子窗口也复用同一个本地页面 origin。

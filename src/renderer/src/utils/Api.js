@@ -26,6 +26,7 @@ const api = {
   addOrRemoveGroupUser: '/group/addOrRemoveGroupUser', //添加或者删除群成员
   search: '/contact/search', //搜索好友
   applyAdd: '/contact/applyAdd', //申请加入
+  searchByKeyword: '/contact/searchByKeyword', //按邮箱或昵称搜索联系人
   loadApply: '/contact/loadApply', //获取申请列表
   dealWithApply: '/contact/dealWithApply', //处理申请
   loadContact: '/contact/loadContact', //获取联系人列表

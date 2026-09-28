@@ -4,13 +4,28 @@
       <el-input
         v-model="contactId"
         clearable
-        placeholder="请输入用户ID或者群组ID"
+        placeholder="邮箱、用户昵称、群昵称或 U/G 编号"
         size="large"
         @keydown.enter="search"
+        @input="clearSearch"
       ></el-input>
       <div class="search-btn iconfont icon-search" @click="search"></div>
     </div>
-    <div v-if="searchResult && Object.keys(searchResult).length > 0" class="search-result-panel">
+    <div v-if="searchResults.length > 1" class="search-match-list" role="list" aria-label="匹配的联系人">
+      <button
+        v-for="item in searchResults"
+        :key="item.contactId"
+        class="search-match-option"
+        :class="{ active: selectedContactId === item.contactId }"
+        type="button"
+        @click="selectedContactId = item.contactId"
+      >
+        <UserBaseInfo :user-info="item" :show-area="item.contactType === 'USER'"></UserBaseInfo>
+        <span class="search-match-type">{{ item.contactType === 'USER' ? '用户' : '群聊' }}</span>
+        <span class="search-match-id">{{ item.contactId }}</span>
+      </button>
+    </div>
+    <div v-if="searchResult" class="search-result-panel">
       <div class="search-result">
         <span class="contact-type">{{ contactTypeName }}</span>
         <UserBaseInfo
@@ -38,7 +53,7 @@
         <span v-if="searchResult.status === 5 || searchResult.status === 6">对方拉黑了你 </span>
       </div>
     </div>
-    <div v-if="!searchResult" class="no-data">没有结果都</div>
+    <div v-else-if="searched && searchResults.length === 0" class="no-data">没有找到匹配的联系人</div>
   </ContentPanel>
   <SearchAdd ref="searchAddRef" @reload="resetFrom"></SearchAdd>
 </template>
@@ -57,7 +72,12 @@ import SearchAdd from '@/views/contact/SearchAdd.vue'
 const userInfoStore = useUserInfoStore()
 
 const contactId = ref()
+const searchResults = ref([])
+const selectedContactId = ref('')
+const searched = ref(false)
+const searchResult = computed(() => searchResults.value.find((item) => item.contactId === selectedContactId.value) || null)
 const contactTypeName = computed(() => {
+  if (!searchResult.value) return ''
   if (userInfoStore.getInfo().userId === searchResult.value.contactId) {
     return '自己'
   } else if (searchResult.value.contactType === 'USER') {
@@ -65,22 +85,33 @@ const contactTypeName = computed(() => {
   } else return '群组'
 })
 
+const clearSearch = () => {
+  searchResults.value = []
+  selectedContactId.value = ''
+  searched.value = false
+}
+
 //搜索
-const searchResult = ref([])
 const search = async () => {
-  if (!contactId.value) {
-    Message.warning('请输入用户ID或者群组ID')
+  const keyword = String(contactId.value || '').trim()
+  clearSearch()
+  if (!keyword) {
+    Message.warning('请输入邮箱、用户或群昵称、用户或群编号')
+    return
   }
   let result = await Request({
-    url: Api.search,
+    url: Api.searchByKeyword,
     params: {
-      contactId: contactId.value
+      keyword
     }
   })
   if (!result) {
+    searched.value = true
     return
   }
-  searchResult.value = result.data
+  searchResults.value = Array.isArray(result.data) ? result.data : []
+  searched.value = true
+  if (searchResults.value.length === 1) selectedContactId.value = searchResults.value[0].contactId
 }
 
 const searchAddRef = ref()
@@ -94,6 +125,7 @@ const applyContact = () => {
 const resetFrom = () => {
   searchAddRef.value = {}
   contactId.value = undefined
+  clearSearch()
 }
 </script>
 
@@ -125,6 +157,45 @@ const resetFrom = () => {
 
 .no-data {
   padding: 30px 0;
+}
+
+.search-match-list {
+  display: grid;
+  max-height: 360px;
+  gap: 8px;
+  overflow: auto;
+  margin-top: 12px;
+}
+
+.search-match-option {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  border: 1px solid #e6e8e5;
+  border-radius: 10px;
+  background: #fff;
+  text-align: left;
+  cursor: pointer;
+
+  &:hover,
+  &.active {
+    border-color: #b7d9c7;
+    background: #f2f8f4;
+  }
+
+  :deep(.user-panel) {
+    flex: 1;
+    min-width: 0;
+  }
+}
+
+.search-match-type,
+.search-match-id {
+  flex: 0 0 auto;
+  color: #66736b;
+  font-size: 12px;
 }
 
 .search-result-panel {
