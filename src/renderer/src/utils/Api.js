@@ -1,8 +1,17 @@
+const localApiOrigin = 'http://127.0.0.1:5050'
+const localWsOrigin = 'ws://127.0.0.1:5051/ws'
+const configuredApiOrigin = String(import.meta.env.RENDERER_VITE_WETALK_SERVER_ORIGIN || '').trim().replace(/\/+$/, '')
+const configuredWsOrigin = String(import.meta.env.RENDERER_VITE_WETALK_WS_ORIGIN || '').trim().replace(/\/+$/, '')
+const apiOrigin = configuredApiOrigin || localApiOrigin
+const wsOrigin = configuredWsOrigin || (configuredApiOrigin
+  ? `${configuredApiOrigin.replace(/^http/, 'ws')}/ws`
+  : localWsOrigin)
+
 const api = {
-  prodDomain: 'http://127.0.0.1:5050',
-  devDomain: 'http://127.0.0.1:5050',
-  prodWsDomain: 'ws://127.0.0.1:5051/ws',
-  devWsDomain: 'ws://127.0.0.1:5051/ws',
+  prodDomain: apiOrigin,
+  devDomain: apiOrigin,
+  prodWsDomain: wsOrigin,
+  devWsDomain: wsOrigin,
   checkCode: '/account/checkCode', //验证码
   registerEmailCode: '/account/registerEmailCode', //注册邮箱验证码
   login: '/account/login', //登录

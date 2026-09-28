@@ -35,6 +35,10 @@ import {
 import { saveWindow } from './windowProxy'
 import store from './store'
 import { ensureAppDirectories } from './utils/platformUtils'
+import { startDesktopApiServer } from './utils/desktopApiServer.mjs'
+import { setDesktopRendererOrigin } from './utils/desktopRendererOrigin'
+
+let desktopApiServer = null
 
 // 禁用 DNS over HTTPS
 app.commandLine.appendSwitch('disable-features', 'DnsOverHttps')
@@ -85,8 +89,11 @@ function createWindow() {
   // Load the remote URL for development or the local html file for production.
   if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
     mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL'])
+  } else if (desktopApiServer) {
+    mainWindow.loadURL(`${desktopApiServer.origin}/index.html`)
   } else {
-    mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
+    app.quit()
+    return
   }
 
   //增加托盘
@@ -258,7 +265,7 @@ function createWindow() {
 // This method will be called when Electron has finished
 // initialization and is ready to create browser windows.
 // Some APIs can only be used after this event occurs.
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   // Set app user model id for windows
   electronApp.setAppUserModelId('com.electron')
 
@@ -271,6 +278,20 @@ app.whenReady().then(() => {
 
   // 确保应用目录结构
   ensureAppDirectories()
+
+  if (!is.dev) {
+    try {
+      desktopApiServer = await startDesktopApiServer({
+        apiOrigin: import.meta.env.RENDERER_VITE_WETALK_SERVER_ORIGIN || 'http://127.0.0.1:5050',
+        rendererDirectory: join(__dirname, '../renderer')
+      })
+      setDesktopRendererOrigin(desktopApiServer.origin)
+    } catch {
+      console.error('WeTalk 本地服务启动失败')
+      app.quit()
+      return
+    }
+  }
 
   createWindow()
 
@@ -287,6 +308,13 @@ app.whenReady().then(() => {
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit()
+  }
+})
+
+app.on('before-quit', () => {
+  if (desktopApiServer) {
+    void desktopApiServer.close()
+    desktopApiServer = null
   }
 })
 

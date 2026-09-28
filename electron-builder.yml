@@ -10,6 +10,7 @@ files:
   - '!{.env,.env.*,.npmrc,pnpm-lock.yaml}'
 asarUnpack:
   - resources/**
+  - node_modules/sqlite3/lib/binding/**/node_sqlite3.node
 win:
   executableName: WeTalkApp
 nsis:

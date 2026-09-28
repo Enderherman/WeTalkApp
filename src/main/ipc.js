@@ -1,6 +1,7 @@
 import { BrowserWindow, ipcMain, shell } from 'electron'
 
 import store from './store'
+import { getDesktopRendererOrigin } from './utils/desktopRendererOrigin'
 import { closeWs, initWs } from './wsClient'
 import {
   addUserSetting, loadLocalUser,
@@ -203,7 +204,12 @@ const openWindow = ({ windowId, title = 'WeTalk', path, width = 960, height = 72
     if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
       newWindow.loadURL(`${process.env['ELECTRON_RENDERER_URL']}/index.html#${path}`)
     } else {
-      newWindow.loadFile(join(__dirname, '../renderer/index.html'), { hash: `#${path}` })
+      const desktopRendererOrigin = getDesktopRendererOrigin()
+      if (desktopRendererOrigin) {
+        newWindow.loadURL(`${desktopRendererOrigin}/index.html#${path}`)
+      } else {
+        newWindow.loadFile(join(__dirname, '../renderer/index.html'), { hash: `#${path}` })
+      }
     }
 
     if (NODE_ENV === 'development') {

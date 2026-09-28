@@ -1,7 +1,6 @@
 import axios from 'axios'
 import { ElLoading } from 'element-plus'
 import Message from '@/plugin/Message'
-import Api from '@/utils/Api'
 
 const contentTypeForm = 'application/x-www-form-urlencoded;charset=UTF-8'
 const contentTypeJson = 'application/json'
@@ -11,7 +10,9 @@ let loading = null
 const instance = axios.create({
   //允许携带头部的token cookie等
   withCredentials: true,
-  baseURL: (import.meta.env.PROD ? Api.prodDomain : '') + '/api',
+  // The renderer always uses the local origin: Vite proxies in dev, and the
+  // packaged Electron app proxies through its loopback HTTP server.
+  baseURL: '/api',
   timeout: 1000 * 10
 })
 
