@@ -240,6 +240,37 @@ const loadChatMessage = () => {
 /**
  * 接受服务器发来消息
  */
+const receiveAiStreamMessage = (message) => {
+  const session = chatSessionList.value.find((item) => item.sessionId === message.sessionId)
+  if (session) {
+    const finalStatus = Number(message.status)
+    const preview = message.messageContent || (finalStatus === 2
+      ? 'AI 生成已停止'
+      : finalStatus === 3
+        ? 'AI 生成失败，请重试'
+        : finalStatus === 1
+          ? 'AI 没有返回文本'
+          : 'AI 正在思考…')
+    session.lastMessage = `${message.sendUserNickName || session.contactName}: ${preview}`
+    session.lastReceiveTime = Number(message.sendTime) || Date.now()
+    sortChatSession(chatSessionList.value)
+  }
+
+  if (message.sessionId !== currentChatSession.value.sessionId) return
+
+  const aiMessage = { ...message, messageType: 14 }
+  if (!aiMessage.messageContent) {
+    const finalStatus = Number(aiMessage.status)
+    if (finalStatus === 2) aiMessage.messageContent = 'AI 生成已停止'
+    else if (finalStatus === 3) aiMessage.messageContent = 'AI 生成失败，请重试'
+    else if (finalStatus === 1) aiMessage.messageContent = 'AI 没有返回文本'
+  }
+  const index = messageList.value.findIndex((item) => item.messageId === aiMessage.messageId)
+  if (index >= 0) messageList.value.splice(index, 1, aiMessage)
+  else messageList.value.push(aiMessage)
+  scrollToBottom()
+}
+
 const onReceiveMessage = () => {
   window.ipcRenderer.on('receiveMessage', (event, message) => {
     //好友申请信息处理
@@ -276,6 +307,13 @@ const onReceiveMessage = () => {
         return item.contactId === message.contactId
       })
       chatSession.contactName = message.extentData
+      return
+    }
+
+    // Streaming frames share the initial AI message ID; update its bubble without
+    // counting every token frame as another unread message.
+    if (message.messageType === 15 || message.messageType === 16) {
+      receiveAiStreamMessage(message)
       return
     }
 
