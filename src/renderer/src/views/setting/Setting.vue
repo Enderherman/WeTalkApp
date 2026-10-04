@@ -42,6 +42,12 @@ const settingMenuList = ref([
     bgColor: '#ffd04f'
   },
   {
+    name: '登录设备',
+    icon: 'icon-user-setting',
+    path: '/setting/devices',
+    bgColor: '#0294f5'
+  },
+  {
     name: '关于WeTalk',
     icon: 'icon-about',
     path: '/setting/about',

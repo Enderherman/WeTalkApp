@@ -18,6 +18,7 @@
     "test:message-text": "node --test tests/messageText.test.mjs",
     "test:update-download": "node --test tests/updateDownload.test.mjs",
     "test:contact-remark": "node --test tests/contactRemark.test.mjs tests/desktopMessageSync.test.mjs tests/sqliteMessageCache.test.mjs",
+    "test:devices": "node --test tests/deviceSessions.test.mjs",
     "postinstall": "electron-builder install-app-deps",
     "build:win": "npm run build && electron-builder --win --config",
     "build:mac": "npm run build && electron-builder --mac --config",

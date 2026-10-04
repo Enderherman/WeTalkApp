@@ -116,6 +116,11 @@ const router = createRouter({
               component: () => import('@/views/setting/About.vue')
             },
             {
+              path: '/setting/devices',
+              name: '登录设备',
+              component: () => import('@/views/setting/DeviceSessions.vue')
+            },
+            {
               path: '/setting/fileManage',
               name: '文件管理',
               component: () => import('@/views/setting/FileManage.vue')
