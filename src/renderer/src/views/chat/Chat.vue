@@ -6,6 +6,7 @@
       <!--2.搜索框-->
       <div class="top-search">
         <button type="button" title="搜索聊天记录" aria-label="搜索聊天记录" @click="historySearchOpen = true">记录</button>
+        <button type="button" @click="showHiddenSessions">已移除</button>
         <el-input v-model="searchKey" clearable placeholder="搜索" size="small" @keyup="search">
           <template #suffix>
             <span class="iconfont icon-search"></span>
@@ -153,6 +154,17 @@
       </li>
     </ul>
   </el-dialog>
+  <el-dialog v-model="hiddenSessionsOpen" title="已移除的会话" width="500px">
+    <p>移除会话只影响本机列表，聊天记录仍然保留；新消息会让会话重新显示。</p>
+    <p v-if="hiddenSessionsLoading">正在读取…</p>
+    <p v-else-if="!hiddenSessions.length">没有已移除的会话</p>
+    <ul class="hidden-session-list">
+      <li v-for="session in hiddenSessions" :key="session.contactId">
+        <span>{{ contactDisplayName(session) }}</span>
+        <el-button @click="restoreHiddenSession(session)">恢复会话</el-button>
+      </li>
+    </ul>
+  </el-dialog>
 </template>
 
 <script>
@@ -222,6 +234,7 @@ const deleteChatSessionFromList = (contactId) => {
     chatSessionList.value = chatSessionList.value.filter((item) => {
       return item.contactId !== contactId
     })
+    messageCountStore.setCount('chatCount', chatSessionList.value.reduce((count, item) => count + (item.noReadCount || 0), 0), true)
   }, 100)
 }
 //是否滚动到底部
@@ -230,6 +243,20 @@ let distanceToBottom = 0
 const currentChatSession = ref({})
 //消息列表
 const messageList = ref([])
+const hiddenSessionsOpen = ref(false)
+const hiddenSessionsLoading = ref(false)
+const hiddenSessions = ref([])
+const showHiddenSessions = async () => {
+  hiddenSessionsOpen.value = true
+  hiddenSessionsLoading.value = true
+  try { hiddenSessions.value = await window.ipcRenderer.invoke('loadHiddenChatSessions') }
+  catch { Message.error('无法读取已移除会话，请重试') }
+  finally { hiddenSessionsLoading.value = false }
+}
+const restoreHiddenSession = (session) => {
+  window.ipcRenderer.send('reloadChatSession', { contactId: session.contactId })
+  hiddenSessionsOpen.value = false
+}
 const historySearchOpen = ref(false)
 const historySearchScope = ref('all')
 const historySearchKeyword = ref('')
@@ -680,6 +707,7 @@ const onReloadChatSession = () => {
   window.ipcRenderer.on('reloadChatSessionCallback', (e, { contactId, chatSessions }) => {
     sortChatSession(chatSessions)
     chatSessionList.value = chatSessions
+    messageCountStore.setCount('chatCount', chatSessions.reduce((count, item) => count + (item.noReadCount || 0), 0), true)
     sendMessage(contactId)
   })
 }
@@ -761,8 +789,10 @@ const setTop = (data) => {
 //删除会话
 const deleteChatSession = (contactId) => {
   deleteChatSessionFromList(contactId)
-  setSessionSelect({})
-  currentChatSession.value = {}
+  if (currentChatSession.value.contactId === contactId) {
+    setSessionSelect({})
+    currentChatSession.value = {}
+  }
   window.ipcRenderer.send('deleteChatSession', contactId)
 }
 
@@ -779,10 +809,10 @@ const onContextMenu = (data, e) => {
         }
       },
       {
-        label: '删除聊天',
+        label: '移除会话',
         onClick: () => {
           Confirm({
-            message: `确定要删除聊天[${data.contactName}]?`,
+            message: `从列表移除会话“${contactDisplayName(data)}”？聊天记录会保留。`,
             okfun: () => {
               deleteChatSession(data.contactId)
             }
@@ -882,6 +912,8 @@ watch(
 </script>
 
 <style scoped lang="less">
+.hidden-session-list { list-style: none; padding: 0; }
+.hidden-session-list li { display: flex; align-items: center; justify-content: space-between; padding: 8px 0; }
 .connection-status { padding: 6px 12px; color: #875800; background: #fff8df; font-size: 12px; }
 .history-search-form { display: flex; gap: 8px; }
 .history-search-form .el-select { width: 150px; flex-shrink: 0; }

@@ -17,6 +17,7 @@ const selectChatSessionUser = () => {
                and status = 1`
   return queryAll(sql, [store.getUserId()])
 }
+const selectHiddenChatSessions = () => queryAll('SELECT * FROM chat_session_user WHERE user_id = ? AND status = 0 ORDER BY last_receive_time DESC', [store.getUserId()])
 
 const addChatSessionUser = (sessionInfo, userId = store.getUserId()) => {
   sessionInfo.userId = userId
@@ -46,10 +47,11 @@ const saveOrUpdateChatSessionUserBatch4Init = async (chatSessionList) => {
   try {
     // 准备所有会话处理操作
     const sessionPromises = chatSessionList.map(async (sessionInfo) => {
-      // 设置会话状态为有效
-      sessionInfo.status = 1
       // 检查会话是否已存在
       const existingSession = await selectUserSessionByContactId(sessionInfo.contactId, userId)
+      const unchanged = existingSession && Number(sessionInfo.lastReceiveTime || 0) <= Number(existingSession.lastReceiveTime || 0) && String(sessionInfo.lastMessage || '') === String(existingSession.lastMessage || '')
+      sessionInfo = { ...sessionInfo, status: existingSession?.status === 0 && unchanged ? 0 : 1 }
+      if (existingSession) sessionInfo.topType = existingSession.topType
       // 根据是否存在决定更新或添加
       if (existingSession) {
         return updateChatSessionUser(sessionInfo, userId)
@@ -236,6 +238,7 @@ export {
   updatePeerReadMessageId,
   updateContactRemark,
   updateReadCursor,
+  selectHiddenChatSessions,
   saveOrUpdateChatSessionUserBatch4Init,
   updateNoReadCount,
   clearNoReadCount,

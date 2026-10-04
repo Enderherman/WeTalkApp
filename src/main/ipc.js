@@ -15,7 +15,8 @@ import {
   topChatSessionUser,
   updateChatSessionByChatMessage,
   updateChatSessionStatus,
-  updateReadCursor
+  updateReadCursor,
+  selectHiddenChatSessions
 } from './database/ChatSessionUserModel'
 import { saveMessage, saveMessageBatch, selectChatMessage, updateMessage } from './database/ChatMessageModel'
 import {
@@ -89,6 +90,7 @@ const onGetLocalStore = () => {
  * 查询chatSession
  */
 const onLoadChatSession = () => {
+  ipcMain.handle('loadHiddenChatSessions', () => selectHiddenChatSessions())
   ipcMain.on('retryConnection', () => {
     const userId = store.getUserId(), token = store.getUserData('token')
     if (userId && token) initWs({ userId, token }, getWindow('main').webContents)

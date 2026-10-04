@@ -72,6 +72,17 @@ for (const legacy of [false, true]) test(`real SQLite ${legacy ? 'legacy migrati
     assert.equal((await api.selectUserSessionByContactId('Upeer')).lastMessage, 'keep private')
     api.testStore.userId = 'Utest'
     assert.equal((await api.selectUserSessionByContactId('Upeer')).lastMessage, 'old account update')
+    await api.topChatSessionUser('Upeer', 1)
+    await api.deleteChatSessionUser('Upeer')
+    await api.saveOrUpdateChatSessionUserBatch4Init([{ contactId: 'Upeer', sessionId: 'session', lastMessage: 'old account update', lastReceiveTime: 1 }])
+    assert.equal((await api.selectHiddenChatSessions()).length, 1)
+    assert.equal((await api.selectChatSessionUser()).length, 0)
+    assert.equal((await api.selectUserSessionByContactId('Upeer')).topType, 1)
+    await api.updateChatSessionStatus('Upeer')
+    assert.equal((await api.selectChatSessionUser()).length, 1)
+    await api.deleteChatSessionUser('Upeer')
+    await api.saveOrUpdateChatSessionUserBatch4Init([{ contactId: 'Upeer', sessionId: 'session', lastMessage: 'new incoming', lastReceiveTime: 2 }])
+    assert.equal((await api.selectChatSessionUser()).length, 1)
     await assert.rejects(api.queryAll('select * from missing_table', []), /no such table/)
   } finally {
     sqlite.Database = NativeDatabase
