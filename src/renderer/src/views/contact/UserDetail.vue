@@ -9,7 +9,7 @@
           </span>
           <template #dropdown>
             <el-dropdown-menu>
-              <el-dropdown-item @click="updateRemark">TODO 设置备注</el-dropdown-item>
+              <el-dropdown-item @click="updateRemark">设置备注</el-dropdown-item>
               <el-dropdown-item @click="delContact">删除联系人</el-dropdown-item>
               <el-dropdown-item @click="addContact2BlackList">加入黑名单</el-dropdown-item>
             </el-dropdown-menu>
@@ -20,7 +20,15 @@
     <div class="part-item">
       <div class="part-row">
         <div class="part-title">备注名</div>
-        <div class="part-content">TODO 没拓展呢</div>
+        <div class="part-content">
+          <template v-if="editingRemark">
+            <el-input v-model="remarkDraft" maxlength="40" placeholder="留空清除备注" aria-label="联系人备注" :disabled="savingRemark" @keydown.enter="saveRemark" />
+            <el-button :loading="savingRemark" @click="saveRemark">保存</el-button>
+            <el-button :disabled="savingRemark" @click="editingRemark = false">取消</el-button>
+          </template>
+          <span v-else>{{ userInfo.remark || '未设置' }}</span>
+          <div v-if="remarkError" role="alert">{{ remarkError }}</div>
+        </div>
       </div>
       <div class="part-row">
         <div class="part-title">个性签名</div>
@@ -36,12 +44,13 @@
 </template>
 
 <script setup>
-import { watch, ref } from 'vue'
+import { watch, ref, onMounted, onUnmounted } from 'vue'
 import Request from '@/utils/Request'
 import Api from '@/utils/Api'
 import { useRoute, useRouter } from 'vue-router'
 import Confirm from '@/utils/Confirm'
 import { useContactStateStore } from '@/stores/ContactStateStore'
+import { validateRemark, applyContactRemark } from '@/utils/contactRemark.mjs'
 
 const contactStoreState = useContactStateStore()
 const route = useRoute()
@@ -118,11 +127,45 @@ const sendMessage = () => {
   })
 }
 //修改备注
-const updateRemark = () => {}
+const editingRemark = ref(false)
+const savingRemark = ref(false)
+const remarkDraft = ref('')
+const remarkError = ref('')
+const updateRemark = () => {
+  remarkDraft.value = userInfo.value.remark || ''
+  remarkError.value = ''
+  editingRemark.value = true
+}
+const saveRemark = async () => {
+  if (savingRemark.value) return
+  let remark
+  try { remark = validateRemark(remarkDraft.value) }
+  catch (error) { remarkError.value = error.message; return }
+  savingRemark.value = true
+  remarkError.value = ''
+  const contactId = userInfo.value.userId
+  try {
+    const result = await Request({ url: Api.saveRemark, params: { contactId, remark } })
+    if (!result) { remarkError.value = '保存备注失败，请重试'; return }
+    if (userInfo.value.userId === contactId) {
+      userInfo.value.remark = remark
+      editingRemark.value = false
+      contactStoreState.setContactReload(null)
+      setTimeout(() => contactStoreState.setContactReload('USER'), 0)
+    }
+  } finally { savingRemark.value = false }
+}
+const onRemarkMessage = (event, message) => {
+  if (message.messageType === 18) applyContactRemark(userInfo.value, message.extentData)
+}
+onMounted(() => window.ipcRenderer.on('receiveMessage', onRemarkMessage))
+onUnmounted(() => window.ipcRenderer.removeListener('receiveMessage', onRemarkMessage))
 watch(
   () => route.query.contactId,
   (newVal, oldVal) => {
     if (newVal) {
+      editingRemark.value = false
+      remarkError.value = ''
       loadUserDetail(newVal)
     }
   },

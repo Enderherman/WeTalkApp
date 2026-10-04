@@ -31,6 +31,13 @@ export function createDesktopMessageSync(deps) {
       if (active()) deps.emit(message)
       return
     }
+    if (type === 18) {
+      const update = message.extentData
+      if (!update || typeof update.contactId !== 'string' || typeof update.remark !== 'string') return
+      await deps.updateContactRemark(update.contactId, update.remark)
+      if (active()) deps.emit(message)
+      return
+    }
     if (type === 6) {
       await deps.updateMessage({ status: message.status }, { messageId: message.messageId })
       if (active()) deps.emit(message)

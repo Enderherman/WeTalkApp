@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { createDesktopMessageSync } from '../src/main/utils/desktopMessageSync.mjs'
 
 function fixture() {
-  const messages = new Map(), sessions = new Map(), emitted = [], receipts = []
+  const messages = new Map(), sessions = new Map(), emitted = [], receipts = [], remarks = []
   let applications = 0
   const deps = {
     userId: () => 'Uself', currentSessionId: () => null,
@@ -17,9 +17,10 @@ function fixture() {
     },
     findSession: async (id) => sessions.get(id), updateReadReceipt: async (item) => receipts.push(item),
     updateMessage: async (value, { messageId }) => messages.set(messageId, { ...messages.get(messageId), ...value }),
-    updateContactName: async () => {}, close: () => {}, emit: (item) => emitted.push(item)
+    updateContactName: async () => {}, close: () => {}, emit: (item) => emitted.push(item),
+    updateContactRemark: async (contactId, remark) => remarks.push({ contactId, remark })
   }
-  return { sync: createDesktopMessageSync(deps), messages, sessions, emitted, receipts, applications: () => applications }
+  return { sync: createDesktopMessageSync(deps), messages, sessions, emitted, receipts, remarks, applications: () => applications }
 }
 const message = (type, id = 1) => ({ messageType: type, messageId: id, sessionId: 'session', contactId: 'Upeer', contactType: 0, sendUserId: 'Upeer', messageContent: 'content', status: 1 })
 
@@ -75,4 +76,14 @@ test('read receipts and upload completion never become chat messages', async () 
   assert.equal(f.messages.get(1).messageType, 5)
   assert.equal(f.messages.get(1).status, 1)
   assert.equal(f.sessions.get('Upeer').noReadCount, 1)
+})
+
+test('remark events update private contact metadata without adding history or unread', async () => {
+  const f = fixture()
+  await f.sync({ messageType: 18, extentData: { contactId: 'Upeer', remark: '同事' } })
+  await f.sync({ messageType: 18, extentData: { contactId: 'Upeer', remark: '' } })
+  assert.deepEqual(f.remarks, [{ contactId: 'Upeer', remark: '同事' }, { contactId: 'Upeer', remark: '' }])
+  assert.equal(f.messages.size, 0)
+  assert.equal(f.sessions.size, 0)
+  assert.equal(f.emitted.length, 2)
 })

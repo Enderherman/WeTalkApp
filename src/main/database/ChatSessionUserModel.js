@@ -227,8 +227,11 @@ const updatePeerReadMessageId = (message) => {
   return run('UPDATE chat_session_user SET peer_read_message_id = MAX(COALESCE(peer_read_message_id, 0), ?) WHERE user_id = ? AND session_id = ?', [cursor, store.getUserId(), message.sessionId])
 }
 
+const updateContactRemark = (contactId, remark) => update('chat_session_user', { remark }, { userId: store.getUserId(), contactId })
+
 export {
   updatePeerReadMessageId,
+  updateContactRemark,
   saveOrUpdateChatSessionUserBatch4Init,
   updateNoReadCount,
   clearNoReadCount,

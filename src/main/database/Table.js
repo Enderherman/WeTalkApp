@@ -23,6 +23,7 @@ const add_table = [
     'session_id varchar(11),' +
     'status integer default 1,' +
     'contact_name varchar(20),' +
+    'remark varchar(40),' +
     'last_message varchar(500),' +
     'last_receive_time bigint,' +
     'no_read_count integer default 0,' +

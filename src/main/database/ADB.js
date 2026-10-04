@@ -32,7 +32,7 @@ const createTable = async () => {
   try {
     // 创建表结构
     for (const table of add_table) {
-      await db.run(table)
+      await run(table, [])
     }
 
     // 旧版 user_setting 表把 server_port 建成了 server 列，迁移已有用户数据库。
@@ -47,6 +47,9 @@ const createTable = async () => {
 
     // 创建索引
     const sessionColumns = await queryAll('pragma table_info(chat_session_user)', [])
+    if (!sessionColumns.some((item) => item.name === 'remark')) {
+      await run('alter table chat_session_user add column remark varchar(40)', [])
+    }
     for (const column of ['last_read_message_id', 'peer_read_message_id']) {
       if (!sessionColumns.some((item) => item.name === column)) {
         await run(`alter table chat_session_user add column ${column} integer default 0`, [])
@@ -55,7 +58,7 @@ const createTable = async () => {
 
     // 创建索引
     for (const index of add_index) {
-      await db.run(index)
+      await run(index, [])
     }
 
     // 修改表结构（如有必要）
@@ -64,7 +67,7 @@ const createTable = async () => {
       const fileIdExists = fileIdList.some((row) => row.name === 'fileId')
 
       if (!fileIdExists && item.sql) {
-        await db.run(item.sql)
+        await run(item.sql, [])
       }
     }
     return Promise.resolve()
@@ -122,14 +125,13 @@ const initTableColumnsMap = async () => {
  */
 const queryOne = (sql, params) => {
   return new Promise((resolve, reject) => {
-    const stmt = db.prepare(sql)
-    stmt.get(params, (err, row) => {
+    db.get(sql, params, (err, row) => {
       if (err) {
-        resolve({})
+        reject(err)
+        return
       }
       resolve(convertDbObj2BizObj(row))
     })
-    stmt.finalize()
   })
 }
 
@@ -143,14 +145,13 @@ const queryOne = (sql, params) => {
  */
 const queryCount = (sql, params) => {
   return new Promise((resolve, reject) => {
-    const stmt = db.prepare(sql)
-    stmt.get(params, (err, row) => {
+    db.get(sql, params, (err, row) => {
       if (err) {
-        resolve(0)
+        reject(err)
+        return
       }
       resolve(Array.from(Object.values(row))[0])
     })
-    stmt.finalize()
   })
 }
 
@@ -164,17 +165,16 @@ const queryCount = (sql, params) => {
  */
 const queryAll = (sql, params) => {
   return new Promise((resolve, reject) => {
-    const stmt = db.prepare(sql)
-    stmt.all(params, (err, rows) => {
+    db.all(sql, params, (err, rows) => {
       if (err) {
-        resolve([])
+        reject(err)
+        return
       }
       rows.forEach((item, index) => {
         rows[index] = convertDbObj2BizObj(item)
       })
       resolve(rows)
     })
-    stmt.finalize()
   })
 }
 
@@ -216,16 +216,13 @@ const toCamelCase = (str) => {
  */
 const run = (sql, params) => {
   return new Promise((resolve, reject) => {
-    const stmt = db.prepare(sql)
-    stmt.run(params, (err, row) => {
+    db.run(sql, params, function (err) {
       if (err) {
-        console.error(`\n执行的SQL: ${sql},params: ${params} ,执行失败: ${err}\n`)
-        resolve('操作数据库失败')
+        reject(err)
+        return
       }
-      console.log(`\n执行的SQL: ${sql},params: ${params} ,执行记录数: ${this.changes}\n`)
       resolve(this.changes)
     })
-    stmt.finalize()
   })
 }
 
@@ -297,11 +294,8 @@ const update = (tableName, data, paramData) => {
   return run(sql, params)
 }
 
-const init = () => {
-  db.serialize(async () => {
-    await createTable()
-    await initTableColumnsMap()
-  })
-}
-init()
-export { run, queryOne, queryAll, queryCount, insert, insertOrUpdate, insertOrIgnore, update }
+const databaseReady = (async () => {
+  await createTable()
+  await initTableColumnsMap()
+})()
+export { databaseReady, run, queryOne, queryAll, queryCount, insert, insertOrUpdate, insertOrIgnore, update }

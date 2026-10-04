@@ -9,7 +9,8 @@
     ></AvatarBase>
     <div class="user-info">
       <div class="nick-name">
-        {{ userInfo.nickName }}
+        {{ userInfo.remark || userInfo.nickName }}
+        <div v-if="userInfo.remark" class="info">昵称：{{ userInfo.nickName }}</div>
         <span v-if="userInfo.sex === 0" class="iconfont icon-woman"></span>
         <span v-if="userInfo.sex === 1" class="iconfont icon-man"></span>
         <div class="info">ID: {{ userInfo.userId || userInfo.contactId }}</div>

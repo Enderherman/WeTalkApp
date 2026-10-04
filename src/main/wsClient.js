@@ -1,6 +1,6 @@
 import WebSocket from 'ws'
 import store from './store'
-import { saveOrUpdateChatSessionByMessage, saveOrUpdateChatSessionUserBatch4Init, selectUserSessionByContactId, updateGroupName, updatePeerReadMessageId } from './database/ChatSessionUserModel'
+import { saveOrUpdateChatSessionByMessage, saveOrUpdateChatSessionUserBatch4Init, selectUserSessionByContactId, updateGroupName, updatePeerReadMessageId, updateContactRemark } from './database/ChatSessionUserModel'
 import { saveMessage, saveMessageBatch, updateMessage, selectChatMessagesByMessageId } from './database/ChatMessageModel'
 import { updateContactApplyNoReadCount } from './database/UserSettingModel'
 import { createRealtimeClient } from './utils/realtimeClient.mjs'
@@ -19,6 +19,7 @@ const initWs = (config, sender) => {
     updateApplications: updateContactApplyNoReadCount,
     updateContactName: updateGroupName,
     updateReadReceipt: updatePeerReadMessageId,
+    updateContactRemark,
     updateMessage,
     findMessage: selectChatMessagesByMessageId,
     saveMessage,

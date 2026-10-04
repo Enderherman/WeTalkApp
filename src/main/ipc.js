@@ -34,6 +34,7 @@ import { is } from '@electron-toolkit/utils'
 import { download } from 'node-gyp/lib/download'
 import { persistOutgoingFile } from './utils/fileUpload.mjs'
 import { externalHttpUrl } from './utils/updateDownload.mjs'
+import { databaseReady } from './database/ADB'
 
 const NODE_ENV = process.env.NODE_ENV
 
@@ -44,11 +45,12 @@ const onLoginOrRegister = (callback) => {
 }
 
 const onLoginSuccess = (callback) => {
-  ipcMain.on('openChat', (e, config) => {
+  ipcMain.on('openChat', async (e, config) => {
+    await databaseReady
     //存储用户id
     store.initUserId(config.userId)
     store.setUserData('token', config.token)
-    addUserSetting(config.userId, config.email)
+    await addUserSetting(config.userId, config.email)
     callback(config)
     initWs(config, e.sender)
   })

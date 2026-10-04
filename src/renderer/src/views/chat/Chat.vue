@@ -33,7 +33,7 @@
     <template #right-content>
       <div v-if="Object.keys(currentChatSession).length > 0" class="title-panel drag">
         <div class="title">
-          <span>{{ currentChatSession.contactName }}</span>
+          <span :title="currentChatSession.contactName">{{ currentChatSession.remark || currentChatSession.contactName }}</span>
           <span v-if="currentChatSession.contactType === 1"
             >({{ currentChatSession.memberCount }})</span
           >
@@ -132,6 +132,7 @@ import { useMessageCountStore } from '@/stores/MessageCountStore'
 import { useRoute } from 'vue-router'
 import SearchResult from '@/views/chat/SearchResult.vue'
 import { messageText, highlightText } from '@/utils/messageText.mjs'
+import { applyContactRemark, contactDisplayName } from '@/utils/contactRemark.mjs'
 
 const route = useRoute()
 const messageCountStore = useMessageCountStore()
@@ -275,6 +276,11 @@ const receiveAiStreamMessage = (message) => {
 
 const onReceiveMessage = () => {
   window.ipcRenderer.on('receiveMessage', (event, message) => {
+    if (message.messageType === 18) {
+      chatSessionList.value.forEach((item) => applyContactRemark(item, message.extentData))
+      applyContactRemark(currentChatSession.value, message.extentData)
+      return
+    }
     if (message.messageType === 0) {
       loadChatSession()
       loadContactApply()
@@ -630,10 +636,10 @@ const search = () => {
   }
   searchList.value = []
   chatSessionList.value.forEach((item) => {
-    const contactName = String(item.contactName || '')
+    const contactName = contactDisplayName(item)
     const lastMessage = messageText(item.lastMessage)
     const query = searchKey.value.toLocaleLowerCase()
-    if (contactName.toLocaleLowerCase().includes(query) || lastMessage.toLocaleLowerCase().includes(query)) {
+    if (contactName.toLocaleLowerCase().includes(query) || String(item.contactName || '').toLocaleLowerCase().includes(query) || lastMessage.toLocaleLowerCase().includes(query)) {
       let newData = Object.assign({}, item)
       newData.searchContactParts = highlightText(contactName, searchKey.value)
       newData.searchLastParts = highlightText(lastMessage, searchKey.value)

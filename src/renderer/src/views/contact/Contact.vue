@@ -36,7 +36,7 @@
               >
                 <Avatar :user-id="contact[item.contactId]" :width="35"></Avatar>
                 <div class="text">
-                  {{ contact[item.contactName] }}
+                  {{ contact.remark || contact[item.contactName] }}
                 </div>
               </div>
             </template>
@@ -64,7 +64,7 @@
 </template>
 
 <script setup>
-import { ref, watch } from 'vue'
+import { ref, watch, onMounted, onUnmounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import Request from '@/utils/Request'
 import Api from '@/utils/Api'
@@ -73,6 +73,7 @@ import { useMessageCountStore } from '@/stores/MessageCountStore'
 import Badge from '@/components/Badge.vue'
 import SearchResult from '@/views/chat/SearchResult.vue'
 import { highlightText } from '@/utils/messageText.mjs'
+import { applyContactRemark, contactDisplayName } from '@/utils/contactRemark.mjs'
 
 const contactStateStore = useContactStateStore()
 const messageCountStore = useMessageCountStore()
@@ -195,7 +196,7 @@ const getContactDetail = (contact, item) => {
       rightTitle.value = `${contact[item.contactName]} (${contact.memberCount || 0})`
     } else {
       // 不是群聊，直接显示名称
-      rightTitle.value = contact[item.contactName]
+      rightTitle.value = contact.remark || contact[item.contactName]
     }
   } else {
     rightTitle.value = null
@@ -228,8 +229,8 @@ const search = () => {
   })
   console.log('allContactList: ', allContactList.value)
   allContactList.value.forEach((item) => {
-    let contactName = item.groupId ? item.groupName : item.contactName
-    if (String(contactName || '').toLocaleLowerCase().includes(searchKey.value.toLocaleLowerCase())) {
+    let contactName = contactDisplayName(item)
+    if (String(contactName || '').toLocaleLowerCase().includes(searchKey.value.toLocaleLowerCase()) || String(item.contactName || '').toLocaleLowerCase().includes(searchKey.value.toLocaleLowerCase())) {
       let newData = Object.assign({}, item)
       newData.searchContactName = contactName
       newData.searchContactParts = highlightText(contactName, searchKey.value)
@@ -252,6 +253,19 @@ const searchClickHandler = (item) => {
 
   searchList.value = []
 }
+
+const onRemarkMessage = (event, message) => {
+  if (message.messageType !== 18) return
+  partList.value.forEach((part) => {
+    part.contactData?.forEach((contact) => {
+      if (applyContactRemark(contact, message.extentData) && contact.contactId === route.query.contactId) {
+        rightTitle.value = contactDisplayName(contact)
+      }
+    })
+  })
+}
+onMounted(() => window.ipcRenderer.on('receiveMessage', onRemarkMessage))
+onUnmounted(() => window.ipcRenderer.removeListener('receiveMessage', onRemarkMessage))
 
 watch(
   () => contactStateStore.contactReload,

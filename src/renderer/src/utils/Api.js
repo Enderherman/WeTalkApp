@@ -33,6 +33,7 @@ const api = {
   getContactUserInfo: '/contact/getContactUserInfo', // 获取联系人信息
   addContact2BlackList: '/contact/addContact2BlackList', //拉黑联系人
   delContact: '/contact/delContact', //删除联系人
+  saveRemark: '/contact/saveRemark',
   getContactInfo: '/contact/getContactInfo', //获取联系人信息
   saveUserInfo: '/account/saveUserInfo', //保存用户信息
   getUserInfo: '/account/getUserInfo', //获取用户信息

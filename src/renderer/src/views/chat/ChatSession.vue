@@ -5,7 +5,7 @@
     <AvatarBase :user-id="data.contactId" ></AvatarBase>
     <div class="user-info">
       <div class="user-name-panel">
-        <div class="user-name">{{ data.contactName }}</div>
+        <div class="user-name" :title="data.contactName">{{ data.remark || data.contactName }}</div>
         <div class="message-time">{{ Utils.formatDate(data.lastReceiveTime) }}</div>
       </div>
       <div class="last-message">{{ messageText(data.lastMessage) }}</div>
