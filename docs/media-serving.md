@@ -33,3 +33,5 @@
 缓存仍以消息编号命名，但 multipart 的 `filename` 从已保存消息的原始 `fileName` 取得，MIME 也显式按原名计算；避免 `100.txt` 等缓存名覆盖用户的文件名。FormData 默认优先用流的路径推断 MIME，因此只设置 filename 不足以覆盖缓存路径后缀，现已同时设置 contentType。
 
 真实本地 multipart HTTP 测试验证中文文本名、PNG和WAV原名/MIME/文件体均一致，并拒绝文件名中的头部控制字符。连同头像转换、媒体服务和上传状态共17项通过，桌面构建通过。真实后端/桌面刷新后名称与下载字节由集成验收再次检查。
+
+后续核对补充：后端缺失头像的业务码602也使用默认头像回退，普通附件602仍返回404；打包实际使用YAML配置，因此在 `electron-builder.yml` 显式声明 `assets → resources/assets`，确保 `process.resourcesPath/assets/default_avatar.png` 存在，不能只依赖package.json中的另一份配置。

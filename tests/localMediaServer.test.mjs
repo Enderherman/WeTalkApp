@@ -153,7 +153,7 @@ test('downloads with real multipart HTTP, recognizes JSON charset errors and pre
         return
       }
       response.setHeader('content-type', 'application/json;charset=UTF-8')
-      response.end(JSON.stringify({ code: mode === 'expired' ? 901 : 404, message: 'private error detail' }))
+      response.end(JSON.stringify({ code: mode === 'expired' ? 901 : mode === 'missing-avatar' ? 602 : 404, message: 'private error detail' }))
     })
   })
   await new Promise((resolve) => upstream.listen(0, '127.0.0.1', resolve))
@@ -173,6 +173,7 @@ test('downloads with real multipart HTTP, recognizes JSON charset errors and pre
   await assert.rejects(downloadMediaToCache(options), { status: 404 })
   const fallback = path.join(directory, 'fallback.png')
   await fs.writeFile(fallback, 'default avatar')
+  mode = 'missing-avatar'
   await downloadMediaToCache({ ...options, partType: 'avatar', fallbackAvatarPath: fallback })
   assert.equal(await fs.readFile(savePath, 'utf8'), 'default avatar')
 })

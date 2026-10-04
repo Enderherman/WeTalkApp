@@ -30,7 +30,7 @@ export async function downloadMediaToCache({ url, fileId, showCover, savePath, p
       let result
       try { result = JSON.parse(text) } catch { throw new MediaRequestError(502) }
       if (result.code === 901) throw new MediaRequestError(401)
-      if (partType !== 'avatar' || ![404, 600].includes(result.code) || !fallbackAvatarPath) throw new MediaRequestError(result.code === 404 ? 404 : 502)
+      if (partType !== 'avatar' || ![404, 600, 602].includes(result.code) || !fallbackAvatarPath) throw new MediaRequestError(result.code === 404 || result.code === 602 ? 404 : 502)
       input = createReadStream(fallbackAvatarPath)
     }
     if (!isActive()) { input.destroy(); throw new MediaRequestError(401) }
