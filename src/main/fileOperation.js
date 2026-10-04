@@ -15,11 +15,13 @@ import { downloadUpdatePackage } from './utils/updateDownload.mjs'
 import { MediaRequestError, listenLocalMediaServer, resolveMediaPath } from './utils/localMediaServer.mjs'
 import { downloadMediaToCache } from './utils/mediaDownload.mjs'
 import { getDesktopRendererOrigin } from './utils/desktopRendererOrigin'
+import { createAvatarCover } from './utils/avatarCover.mjs'
+import { mediaExecutablePath } from './utils/mediaExecutable.mjs'
 
 // 引入 ffmpeg 相关包
 const ffmpeg = require('fluent-ffmpeg')
-const ffmpegPath = require('ffmpeg-static')
-const ffprobePath = require('ffprobe-static').path
+const ffmpegPath = mediaExecutablePath(require('ffmpeg-static'))
+const ffprobePath = mediaExecutablePath(require('ffprobe-static').path)
 
 // 配置 ffmpeg 路径
 ffmpeg.setFfmpegPath(ffmpegPath)
@@ -244,34 +246,15 @@ const closeLocalServer = () => {
  * 创建头像的cover
  */
 const createCover = (filePath) => {
-  return new Promise((resolve, reject) => {
-    let avatarId = store.getUserId() + '_temp'
-    let coverId = store.getUserId() + '_temp_cover'
-
-    getLocalFilePath('avatar', false, avatarId).then((avatarPath) => {
-      fs.mkdirSync(path.dirname(avatarPath), { recursive: true })
-
-      ffmpeg(filePath)
-        .output(avatarPath)
-        .on('end', async () => {
-          try {
-            const coverPath = await getLocalFilePath('avatar', false, coverId)
-            await generateThumbnail(filePath, coverPath)
-            resolve({
-              avatarStream: fs.readFileSync(avatarPath),
-              coverStream: fs.readFileSync(coverPath)
-            })
-          } catch (err) {
-            console.error('createCover 缩略图生成失败:', err)
-            reject(err)
-          }
-        })
-        .on('error', (err) => {
-          console.error('createCover 原始头像生成失败:', err)
-          reject(err)
-        })
-        .run()
-    }).catch(reject)
+  const accountId = store.getUserId()
+  const directory = store.getUserData('localFileFolder')
+  return createAvatarCover({
+    directory, inputPath: filePath,
+    isActive: () => Boolean(accountId && store.getUserId() === accountId),
+    convertImage: (inputPath, outputPath) => new Promise((resolve, reject) => {
+      ffmpeg(inputPath).output(outputPath).frames(1).on('end', resolve).on('error', reject).run()
+    }),
+    createThumbnail: generateThumbnail
   })
 }
 
