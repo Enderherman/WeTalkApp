@@ -16,7 +16,7 @@ export async function mountSfc(relativePath, context, mocks = {}, components = {
   const script = compileScript(descriptor, { id: key, inlineTemplate: true })
   const output = await build({
     stdin: { contents: script.content, resolveDir: path.dirname(filename), sourcefile: filename + '.js' },
-    bundle: true, write: false, platform: 'node', format: 'cjs', external: ['vue'],
+    bundle: true, write: false, platform: 'node', format: 'cjs', external: ['vue', 'vue-router'],
     define: { 'import.meta.env': '{}' },
     plugins: [{ name: 'sfc-harness', setup(builder) {
       builder.onResolve({ filter: /^@\// }, (args) => mocks[args.path]
@@ -44,7 +44,8 @@ export async function mountSfc(relativePath, context, mocks = {}, components = {
     nextSibling: (node) => { const list = node.parent?.children || []; return list[list.indexOf(node) + 1] || null },
     querySelector: () => null,
   })
-  const app = renderer.createApp(compiled.exports.default)
+  const app = renderer.createApp(compiled.exports.default, context.props || {})
+  for (const plugin of context.plugins || []) app.use(plugin)
   const warnings = []
   app.config.warnHandler = (message) => warnings.push(message)
   app.directive('infinite-scroll', {})
@@ -58,5 +59,5 @@ export async function mountSfc(relativePath, context, mocks = {}, components = {
   const text = (node) => (node.tag === '#comment' ? '' : node.text || '') + node.children.map(text).join('')
   const flush = async () => { await new Promise((resolve) => setImmediate(resolve)); await Vue.nextTick() }
   await flush()
-  return { tree, nodes, text, flush, warnings, unmount() { app.unmount(); delete globalThis[key] } }
+  return { tree, nodes, text, flush, warnings, component: compiled.exports.default, unmount() { app.unmount(); delete globalThis[key] } }
 }

@@ -60,6 +60,7 @@
 
 <script setup>
 import { computed, ref } from 'vue'
+import { useRouter } from 'vue-router'
 
 import Api from '@/utils/Api'
 import Request from '@/utils/Request'
@@ -70,6 +71,7 @@ import UserBaseInfo from '@/components/UserBaseInfo.vue'
 import SearchAdd from '@/views/contact/SearchAdd.vue'
 
 const userInfoStore = useUserInfoStore()
+const router = useRouter()
 
 const contactId = ref()
 const searchResults = ref([])
@@ -117,6 +119,15 @@ const search = async () => {
 const searchAddRef = ref()
 const applyContact = () => {
   searchAddRef.value.show(searchResult.value)
+}
+
+const sendMessage = () => {
+  const contact = searchResult.value
+  if (!contact || contact.status !== 1 || contact.contactId === userInfoStore.getInfo().userId) return
+  return router.push({
+    path: '/chat',
+    query: { chatId: contact.contactId, timestamp: Date.now() }
+  })
 }
 
 /**

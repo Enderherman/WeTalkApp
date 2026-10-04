@@ -1,5 +1,5 @@
 <template>
-  <div class="image-panel" @click="showImageHander">
+  <div class="image-panel">
     <el-image :src="serverUrl" fit="scale-down" :width="width">
       <template #error>
         <div class="iconfont icon-image-error"></div>

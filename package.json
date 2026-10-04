@@ -33,6 +33,7 @@
     "test:ipc-security": "node --test tests/ipcSecurity.test.mjs",
     "test:message-mirror": "node --test tests/desktopMessageSync.test.mjs tests/messageEchoMerge.test.mjs tests/textOutbox.test.mjs tests/sqliteMessageCache.test.mjs",
     "test:contact-apply-actions": "node --test tests/contactApplyActions.test.mjs",
+    "test:contact-search-actions": "node --test tests/contactSearchActions.test.mjs tests/localImageClick.test.mjs",
     "postinstall": "electron-builder install-app-deps",
     "build:win": "npm run build && electron-builder --win --config",
     "build:mac": "npm run build && electron-builder --mac --config",
