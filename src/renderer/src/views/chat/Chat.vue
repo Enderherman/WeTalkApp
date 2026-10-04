@@ -5,6 +5,7 @@
       <div class="drag-panel drag"></div>
       <!--2.搜索框-->
       <div class="top-search">
+        <button type="button" title="搜索聊天记录" aria-label="搜索聊天记录" @click="historySearchOpen = true">记录</button>
         <el-input v-model="searchKey" clearable placeholder="搜索" size="small" @keyup="search">
           <template #suffix>
             <span class="iconfont icon-search"></span>
@@ -57,6 +58,7 @@
             :key="'message' + data.messageId"
             :id="'message' + data.messageId"
             class="message-item"
+            :class="{ 'history-match': data.messageId === historyMatchId }"
           >
             <!--展示时间-->
             <template
@@ -124,6 +126,29 @@
     ref="chatGroupDetailRef"
     @delete-chat-session-callback="deleteChatSession"
   ></ChatGroupDetail>
+  <el-dialog v-model="historySearchOpen" title="搜索聊天记录" width="640px" @closed="closeHistorySearch">
+    <div class="history-search-form">
+      <el-select v-model="historySearchScope" aria-label="搜索范围">
+        <el-option label="当前会话" value="current" :disabled="!currentChatSession.contactId" />
+        <el-option label="全部会话" value="all" />
+      </el-select>
+      <el-input v-model="historySearchKeyword" maxlength="100" aria-label="历史消息关键词" placeholder="搜索完整聊天历史" @keydown.enter="runHistorySearch" />
+      <el-button :loading="historySearchState.loading" @click="runHistorySearch">搜索</el-button>
+      <el-button v-if="historySearchState.loading" @click="historySearch.cancel">停止</el-button>
+    </div>
+    <p aria-live="polite">已检索 {{ historySearchState.scanned }} 条，找到 {{ historySearchState.results.length }} 条</p>
+    <p v-if="historySearchState.error" role="alert">{{ historySearchState.error }}</p>
+    <p v-if="locatingHistory" role="status">正在加载并定位消息…</p>
+    <ul class="history-search-results">
+      <li v-for="message in historySearchState.results" :key="message.sessionId + ':' + message.messageId">
+        <button type="button" :disabled="locatingHistory" @click="jumpToHistoryMessage(message)">
+          <strong>{{ message.sourceContactName }}</strong>
+          <small>{{ new Date(Number(message.sendTime)).toLocaleString('zh-CN') }}</small>
+          <span><span v-for="(part, index) in highlightText(message.searchText, historySearchKeyword)" :key="index" :class="{ highlight: part.match }">{{ part.text }}</span></span>
+        </button>
+      </li>
+    </ul>
+  </el-dialog>
 </template>
 
 <script>
@@ -157,6 +182,7 @@ import { createReadCursorWriter, canMarkVisibleSession } from '@/utils/readCurso
 import { createAiStopper } from '@/utils/aiMessages.mjs'
 import { createTextOutbox } from '@/utils/textOutbox.mjs'
 import Message from '@/plugin/Message'
+import { createHistorySearch } from '@/utils/historySearch.mjs'
 
 const route = useRoute()
 const userInfoStore = useUserInfoStore()
@@ -200,6 +226,41 @@ let distanceToBottom = 0
 const currentChatSession = ref({})
 //消息列表
 const messageList = ref([])
+const historySearchOpen = ref(false)
+const historySearchScope = ref('all')
+const historySearchKeyword = ref('')
+const historyMatchId = ref(null)
+const locatingHistory = ref(false)
+let historyLocationGeneration = 0
+const historySearchState = reactive({ results: [], loading: false, scanned: 0, error: '' })
+const historySearch = createHistorySearch({
+  state: historySearchState,
+  fetchPage: async (contactId, beforeMessageId, pageSize) => {
+    const result = await Request({ url: Api.loadHistory, params: { contactId, beforeMessageId: beforeMessageId ?? '', pageSize }, showLoading: false, showError: false })
+    return result?.data
+  }
+})
+const runHistorySearch = () => historySearch.run(historySearchScope.value === 'current' ? [currentChatSession.value].filter((item) => item.contactId) : chatSessionList.value, historySearchKeyword.value)
+const closeHistorySearch = () => { historySearch.cancel(); historyLocationGeneration++; locatingHistory.value = false }
+const jumpToHistoryMessage = async (message) => {
+  const session = chatSessionList.value.find((item) => item.contactId === message.sourceContactId)
+  if (!session || locatingHistory.value) return
+  locatingHistory.value = true
+  const version = ++historyLocationGeneration
+  historySearch.cancel()
+  try {
+    await chatSessionClickHandler(session)
+    while (version === historyLocationGeneration && currentChatSession.value.contactId === session.contactId && !messageList.value.some((item) => item.messageId === message.messageId) && historyState.hasMore && !historyState.error) {
+      await loadChatMessage()
+    }
+    if (version !== historyLocationGeneration || currentChatSession.value.contactId !== session.contactId) return
+    if (!messageList.value.some((item) => item.messageId === message.messageId)) { historySearchState.error = '无法定位该消息，请重新搜索'; return }
+    historyMatchId.value = message.messageId
+    historySearchOpen.value = false
+    await nextTick()
+    document.getElementById('message' + message.messageId)?.scrollIntoView({ block: 'center' })
+  } finally { if (version === historyLocationGeneration) locatingHistory.value = false }
+}
 const outboxState = reactive({ items: [], online: true, ready: false, error: '' })
 const outboxUserId = userInfoStore.getInfo().userId
 const outbox = createTextOutbox({
@@ -298,6 +359,7 @@ const messagePageInfo = {
  * 会话点击处理
  */
 const chatSessionClickHandler = (item) => {
+  historyMatchId.value = null
   distanceToBottom = 0
   // 在点击时重置forceGet状态，触发头像更新
   // if (item.contactId) {
@@ -323,12 +385,13 @@ const chatSessionClickHandler = (item) => {
   historyPager.reset(item.contactId)
 
   // console.log('点击聊天会话', item)
-  loadChatMessage()
+  const loadingHistory = loadChatMessage()
   //设置选中session
   setSessionSelect({
     contactId: item.contactId,
     sessionId: item.sessionId
   })
+  return loadingHistory
 }
 /**
  * 更新当前Session信息
@@ -651,6 +714,7 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  closeHistorySearch()
   outbox.dispose()
   window.ipcRenderer.removeListener('connectionState', onConnectionState)
   chatDisposed = true
@@ -807,6 +871,14 @@ watch(
 </script>
 
 <style scoped lang="less">
+.history-search-form { display: flex; gap: 8px; }
+.history-search-form .el-select { width: 150px; flex-shrink: 0; }
+.history-search-results { list-style: none; padding: 0; max-height: 400px; overflow: auto; }
+.history-search-results button { width: 100%; text-align: left; padding: 12px; border: 0; border-bottom: 1px solid #ddd; background: white; cursor: pointer; }
+.history-search-results small { display: block; color: #667085; margin: 4px 0; }
+.history-search-results span { white-space: pre-wrap; overflow-wrap: anywhere; }
+.highlight { color: #a63d00; background: #fff2bd; }
+.history-match { outline: 2px solid #dba74e; border-radius: 6px; }
 .pending-message { text-align: right; padding: 12px; white-space: pre-wrap; overflow-wrap: anywhere; }
 .pending-message small { display: block; color: #667085; margin-top: 4px; }
 .drag-panel {
