@@ -27,7 +27,7 @@
                 <el-dropdown-item @click="dealWithApply(item.applyId, item.contactType, 2)"
                   >拒绝
                 </el-dropdown-item>
-                <el-dropdown-item @click="dealWithApply(item.applyId, item.contactType, 4)"
+                <el-dropdown-item @click="dealWithApply(item.applyId, item.contactType, 3)"
                   >拉黑
                 </el-dropdown-item>
               </template>
