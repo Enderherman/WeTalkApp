@@ -37,6 +37,7 @@ import store from './store'
 import { ensureAppDirectories } from './utils/platformUtils'
 import { startDesktopApiServer } from './utils/desktopApiServer.mjs'
 import { setDesktopRendererOrigin } from './utils/desktopRendererOrigin'
+import { closeWs } from './wsClient'
 
 let desktopApiServer = null
 
@@ -312,6 +313,7 @@ app.on('window-all-closed', () => {
 })
 
 app.on('before-quit', () => {
+  closeWs()
   if (desktopApiServer) {
     void desktopApiServer.close()
     desktopApiServer = null

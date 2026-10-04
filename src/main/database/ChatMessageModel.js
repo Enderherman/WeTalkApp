@@ -9,7 +9,6 @@ import {
   update
 } from './ADB'
 import store from '../store'
-import { updateNoReadCount } from './ChatSessionUserModel'
 
 /**
  * 存储单条消息
@@ -26,23 +25,8 @@ const saveMessage = (chatMessage) => {
  * @returns {Promise<void>}
  */
 const saveMessageBatch = async (chatMessageList) => {
-  // 计算每个联系人的未读消息数量
-  const chatSessionCountMap = {}
-
-  for (const chatMessage of chatMessageList) {
-    const contactId = chatMessage.contactType === 1 ? chatMessage.contactId : chatMessage.sendUserId
-
-    chatSessionCountMap[contactId] = (chatSessionCountMap[contactId] ?? 0) + 1
-  }
-
-  // 并行更新所有联系人的未读消息计数
-  const updatePromises = Object.entries(chatSessionCountMap).map(([contactId, count]) =>
-    updateNoReadCount(contactId, count)
-  )
-
-  await Promise.all(updatePromises)
-
-  // 并行保存所有消息
+  // INIT already contains authoritative unread counts. Hydration must not add
+  // every recent message again on each reconnect.
   const savePromises = chatMessageList.map((chatMessage) => saveMessage(chatMessage))
   await Promise.all(savePromises)
 }

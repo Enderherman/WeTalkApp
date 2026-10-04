@@ -273,6 +273,19 @@ const receiveAiStreamMessage = (message) => {
 
 const onReceiveMessage = () => {
   window.ipcRenderer.on('receiveMessage', (event, message) => {
+    if (message.messageType === 0) {
+      loadChatSession()
+      loadContactApply()
+      return
+    }
+    if (message.messageType === 17) {
+      const session = chatSessionList.value.find((item) => item.sessionId === message.sessionId)
+      if (session) session.peerReadMessageId = Math.max(session.peerReadMessageId || 0, message.messageId || 0)
+      if (currentChatSession.value.sessionId === message.sessionId) {
+        currentChatSession.value.peerReadMessageId = Math.max(currentChatSession.value.peerReadMessageId || 0, message.messageId || 0)
+      }
+      return
+    }
     //好友申请信息处理
     if (message.messageType === 4) {
       loadContactApply()
@@ -306,7 +319,8 @@ const onReceiveMessage = () => {
       const chatSession = chatSessionList.value.find((item) => {
         return item.contactId === message.contactId
       })
-      chatSession.contactName = message.extentData
+      if (chatSession) chatSession.contactName = message.extentData
+      if (currentChatSession.value.contactId === message.contactId) currentChatSession.value.contactName = message.extentData
       return
     }
 
@@ -320,6 +334,7 @@ const onReceiveMessage = () => {
     let currentSession = chatSessionList.value.find((item) => {
       return item.sessionId === message.sessionId
     })
+    if (!message.extentData?.sessionId) return
     if (currentSession === null || currentSession === undefined) {
       chatSessionList.value.push(message.extentData)
     } else {
@@ -327,7 +342,7 @@ const onReceiveMessage = () => {
     }
     sortChatSession(chatSessionList.value)
     if (message.sessionId !== currentChatSession.value.sessionId) {
-      messageCountStore.setCount('chatCount', 1, false)
+      if (message.incrementUnread !== false) messageCountStore.setCount('chatCount', 1, false)
     } else {
       // console.log('信息', message, '\n')
       // console.log('列表', messageList.value)
@@ -343,7 +358,6 @@ const onReceiveMessage = () => {
       const idx = messageList.value.findIndex((item) => item.messageId === message.messageId)
       if (idx > -1) {
         // 用新的 message 对象替换原来的位置
-        message.messageType = 14
         messageList.value.splice(idx, 1, message)
       } else {
         messageList.value.push(message)

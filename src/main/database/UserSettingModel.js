@@ -13,7 +13,10 @@ const userDir = os.homedir()
 /**
  * 更新好友申请数量
  */
-const updateContactApplyNoReadCount = (unreadCount) => {
+const updateContactApplyNoReadCount = (unreadCount, replace = false) => {
+  if (replace) {
+    return run('UPDATE user_setting SET contact_no_read = ? WHERE user_id = ?', [unreadCount, store.getUserId()])
+  }
   let sql
   if (unreadCount) {
     sql = `UPDATE user_setting

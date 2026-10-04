@@ -46,6 +46,14 @@ const createTable = async () => {
     }
 
     // 创建索引
+    const sessionColumns = await queryAll('pragma table_info(chat_session_user)', [])
+    for (const column of ['last_read_message_id', 'peer_read_message_id']) {
+      if (!sessionColumns.some((item) => item.name === column)) {
+        await run(`alter table chat_session_user add column ${column} integer default 0`, [])
+      }
+    }
+
+    // 创建索引
     for (const index of add_index) {
       await db.run(index)
     }

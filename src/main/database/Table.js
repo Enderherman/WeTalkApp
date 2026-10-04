@@ -26,6 +26,8 @@ const add_table = [
     'last_message varchar(500),' +
     'last_receive_time bigint,' +
     'no_read_count integer default 0,' +
+    'last_read_message_id integer default 0,' +
+    'peer_read_message_id integer default 0,' +
     'member_count integer,' +
     'top_type integer default 0,' +
     'primary key (user_id, contact_id)' +

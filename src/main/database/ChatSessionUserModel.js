@@ -128,7 +128,8 @@ const topChatSessionUser = (contactId, topType) => {
 
 const updateChatSessionByChatMessage = async (
   currentSessionId,
-  { sessionId, contactName, lastMessage, lastReceiveTime, contactId, memberCount }
+  { sessionId, contactName, lastMessage, lastReceiveTime, contactId, memberCount },
+  { incrementUnread = true } = {}
 ) => {
   const params = [lastMessage, lastReceiveTime]
   let sql = `UPDATE chat_session_user
@@ -139,12 +140,12 @@ const updateChatSessionByChatMessage = async (
     sql = sql + `,contact_name = ?`
     params.push(contactName)
   }
-  if (memberCount) {
+  if (memberCount !== undefined && memberCount !== null) {
     sql = sql + `,member_count = ?`
     params.push(memberCount)
   }
   //未选中增加未读数
-  if (sessionId !== currentSessionId) {
+  if (incrementUnread && sessionId !== currentSessionId) {
     sql = sql + `,no_read_count = no_read_count + 1`
   }
   sql = sql + ` WHERE user_id = ? and contact_id = ?`
@@ -174,17 +175,17 @@ const readAll = (contactId) => {
  * @param {number} [sessionInfo.memberCount] - 成员数量
  * @returns {Promise<void>} - 返回一个Promise，操作完成后解析
  */
-const saveOrUpdateChatSessionByMessage = async (currentSessionId, sessionInfo) => {
+const saveOrUpdateChatSessionByMessage = async (currentSessionId, sessionInfo, options = {}) => {
   try {
     // 查询用户是否已有与该联系人的会话
     const existingSession = await selectUserSessionByContactId(sessionInfo.contactId)
 
     if (existingSession) {
       // 会话已存在，更新现有会话
-      await updateChatSessionByChatMessage(currentSessionId, sessionInfo)
+      await updateChatSessionByChatMessage(currentSessionId, sessionInfo, options)
     } else {
       // 会话不存在，创建新会话并设置未读计数为1
-      sessionInfo.noReadCount = 1
+      sessionInfo.noReadCount = options.incrementUnread !== false && sessionInfo.sessionId !== currentSessionId ? 1 : 0
       await addChatSessionUser(sessionInfo)
     }
   } catch (error) {
@@ -220,7 +221,14 @@ const updateChatSessionStatus = (contactId) => {
   }
   return update('chat_session_user', sessionInfo, paramData)
 }
+const updatePeerReadMessageId = (message) => {
+  const cursor = Number(message.messageId)
+  if (!Number.isSafeInteger(cursor) || cursor < 1 || message.contactType === 1) return Promise.resolve()
+  return run('UPDATE chat_session_user SET peer_read_message_id = MAX(COALESCE(peer_read_message_id, 0), ?) WHERE user_id = ? AND session_id = ?', [cursor, store.getUserId(), message.sessionId])
+}
+
 export {
+  updatePeerReadMessageId,
   saveOrUpdateChatSessionUserBatch4Init,
   updateNoReadCount,
   clearNoReadCount,
