@@ -15,7 +15,8 @@
           hasChecked: '${checked}/${total}'
         }"
         :data="dataList"
-        :props="{ key: 'contactId', label: 'contactName ' }"
+        :props="{ key: 'contactId', label: 'contactName' }"
+        :disabled="submitState.saving"
         filterable
         :filter-method="search"
       >
@@ -30,20 +31,20 @@
               >
               </AvatarBase>
             </div>
-            <div class="nick-name">{{ option.contactName }}</div>
+            <div class="nick-name" :title="option.contactName">{{ option.remark || option.contactName }}</div>
           </div>
         </template>
       </el-transfer>
+      <p v-if="submitState.error" role="alert">{{ submitState.error }}</p>
     </DialogX>
   </div>
 </template>
 
 <script setup>
 import AvatarBase from '@/components/AvatarBase.vue'
-import { ref } from 'vue'
-import Api from '@/utils/Api'
-import Message from '@/plugin/Message'
+import { ref, reactive } from 'vue'
 import Request from '@/utils/Request'
+import { createGroupMemberSubmitter } from '@/utils/groupMembers.mjs'
 
 const dialogConfig = ref({
   show: false,
@@ -60,7 +61,7 @@ const dialogConfig = ref({
 })
 
 const search = (query, item) => {
-  return item.contactName.toLowerCase().includes(query.toLowerCase())
+  return `${item.remark || ''} ${item.contactName || ''}`.toLowerCase().includes(query.toLowerCase())
 }
 const dataList = ref([])
 const formData = ref({
@@ -68,6 +69,7 @@ const formData = ref({
 })
 
 const show = ({ contactList, groupId, opType }) => {
+  submitState.error = ''
   dialogConfig.value.title = opType === 0 ? '移除群员' : '添加群员'
   dialogConfig.value.show = true
   dataList.value = contactList
@@ -83,24 +85,9 @@ defineExpose({
 })
 
 const emit = defineEmits(['callback'])
-const submitData = () => {
-  if (formData.value.selectContacts.length === 0) {
-    Message.warning('请选择联系人')
-    return
-  }
-  let params = {}
-  Object.assign(params, formData.value)
-  params.selectContacts = params.selectContacts.join(',')
-  let result = Request({
-    url: Api.addOrRemoveGroupUser,
-    params
-  })
-  if (!result) {
-    return
-  }
-  dialogConfig.value.show = false
-  emit('callback')
-}
+const submitState = reactive({ saving: false, error: '' })
+const submitMembers = createGroupMemberSubmitter({ request: Request, state: submitState, onSuccess: () => { dialogConfig.value.show = false; emit('callback') } })
+const submitData = () => submitMembers(formData.value)
 </script>
 
 <style scoped lang="less">

@@ -41,7 +41,7 @@
         data.messageType === 5 ? 'content-panel-media' : ''
       ]"
     >
-      <div v-if="data.contactType === 1" class="nick-name">{{ data.sendUserName }}</div>
+      <div v-if="data.contactType === 1" class="nick-name">{{ data.sendUserNickName }}</div>
       <div v-if="aiState" class="ai-message">
         <div class="content">{{ messageText(data.messageContent) || aiStateLabels[aiState] }}</div>
         <div class="ai-status" aria-live="polite">{{ aiStateLabels[aiState] }}</div>

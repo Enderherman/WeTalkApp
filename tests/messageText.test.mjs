@@ -50,3 +50,8 @@ test('actual AI template shows cumulative text while generation is pending', asy
   assert.match(html, /已有部分回答/)
   assert.match(html, /停止生成/)
 })
+
+test('group message template displays the server sender nickname', async () => {
+  const html = await renderTemplate('ChatMessage.vue', { data: { sendUserId: 'peer', sendUserNickName: '群成员昵称', contactType: 1, messageType: 2, status: 1, messageContent: 'hello' }, userInfoStore: { getInfo: () => ({ userId: 'self' }) }, messageText })
+  assert.match(html, /群成员昵称/)
+})

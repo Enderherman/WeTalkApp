@@ -60,6 +60,7 @@ import { useContactStateStore } from '@/stores/ContactStateStore'
 import AvatarBase from '@/components/AvatarBase.vue'
 import UserSelect from '@/views/chat/UserSelect.vue'
 import Message from '@/plugin/Message'
+import { removableGroupMembers } from '@/utils/groupMembers.mjs'
 
 const userInfoStore = useUserInfoStore()
 const contactStateStore = useContactStateStore()
@@ -78,8 +79,8 @@ const show = async (groupId) => {
     showError: false,
     errorCallback: (response) => {
       Confirm({
-        message: response.data.message,
-        showCancel: false
+        message: response.message || '无法读取群资料',
+        showCancelBtn: false
       })
     }
   })
@@ -125,11 +126,7 @@ const addUser = async () => {
   })
 }
 const removeUser = async () => {
-  let contactList = memberList.value.map((item) => item)
-  contactList.forEach((item) => {
-    item.contactId = item.userId
-  })
-  contactList.splice(0, 1)
+  const contactList = removableGroupMembers(memberList.value, groupInfo.value.groupOwnId)
   userSelectRef.value.show({
     contactList,
     groupId: groupInfo.value.groupId,
@@ -159,6 +156,7 @@ const leaveGroup = async () => {
         return
       }
       Message.success('退出成功')
+      contactStateStore.setContactReload('LEAVE_GROUP')
       emit('deleteChatSessionCallback', groupInfo.value.groupId)
       showDrawer.value = false
     }
@@ -182,6 +180,8 @@ const dissolutionGroup = async () => {
         return
       }
       Message.success('解散成功')
+      emit('deleteChatSessionCallback', groupInfo.value.groupId)
+      contactStateStore.setContactReload('DISSOLUTION_GROUP')
       showDrawer.value = false
     }
   })
