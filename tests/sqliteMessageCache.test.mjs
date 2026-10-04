@@ -28,7 +28,7 @@ for (const legacy of [false, true]) test(`real SQLite ${legacy ? 'legacy migrati
       await new Promise((resolve, reject) => oldDatabase.close((error) => error ? reject(error) : resolve()))
     }
     const result = await build({
-      stdin: { contents: "export * from './src/main/database/ADB.js'; export * from './src/main/database/ChatSessionUserModel.js'; export * from './src/main/database/ChatMessageModel.js'", resolveDir: root },
+      stdin: { contents: "export * from './src/main/database/ADB.js'; export * from './src/main/database/ChatSessionUserModel.js'; export * from './src/main/database/ChatMessageModel.js'; export * from './src/main/database/TextOutboxModel.js'", resolveDir: root },
       bundle: true, write: false, platform: 'node', format: 'cjs', external: ['sqlite3'],
       plugins: [{ name: 'isolated-user-data', setup(builder) {
         builder.onResolve({ filter: /^os$/ }, () => ({ path: 'test-os', namespace: 'test' }))
@@ -61,6 +61,10 @@ for (const legacy of [false, true]) test(`real SQLite ${legacy ? 'legacy migrati
     assert.equal(readSession.noReadCount, 0)
     await api.updateContactRemark('Upeer', '')
     assert.equal((await api.selectUserSessionByContactId('Upeer')).remark, '')
+    await api.saveTextDraft({ clientMessageId: 'key-1', contactId: 'Upeer', sessionId: 'session', messageContent: 'offline', createdAt: 1, status: 'queued' })
+    assert.equal((await api.loadTextOutbox())[0].messageContent, 'offline')
+    await api.removeTextDraft('key-1')
+    assert.equal((await api.loadTextOutbox()).length, 0)
     await assert.rejects(api.queryAll('select * from missing_table', []), /no such table/)
   } finally {
     sqlite.Database = NativeDatabase

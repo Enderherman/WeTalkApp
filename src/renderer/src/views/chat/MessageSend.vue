@@ -69,7 +69,7 @@
           <span class="empty-msg">不能发送空白信息</span>
         </template>
         <template #reference>
-          <span class="send-btn" @click="sendMessage">发送(S)</span>
+          <button class="send-btn" type="button" :disabled="queueingText" @click="sendMessage">{{ queueingText ? '保存中…' : '发送(S)' }}</button>
         </template>
       </el-popover>
     </div>
@@ -94,6 +94,10 @@ const props = defineProps({
   currentChatSession: {
     type: Object,
     default: {}
+  },
+  queueText: {
+    type: Function,
+    required: true
   }
 })
 //隐藏展示popover
@@ -121,7 +125,9 @@ const sendEmoji = (emoji) => {
 const fileLimit = 10
 
 const emit = defineEmits(['sendMessage4Local'])
-const sendMessage = (e) => {
+const queueingText = ref(false)
+const sendMessage = async (e) => {
+  if (e.isComposing || e.keyCode === 229 || queueingText.value) return
   if (e.shiftKey && e.keyCode === 13) {
     return
   }
@@ -132,13 +138,11 @@ const sendMessage = (e) => {
     showSendMsgPopover.value = true
     return
   }
-  sendMessageDo(
-    {
-      messageContent,
-      messageType: 2
-    },
-    true
-  )
+  queueingText.value = true
+  try {
+    const saved = await props.queueText(messageContent)
+    if (saved && msgContent.value.replace(/\s*$/g, '') === messageContent) msgContent.value = ''
+  } finally { queueingText.value = false }
 }
 
 //发送消息处理

@@ -36,6 +36,7 @@ import { download } from 'node-gyp/lib/download'
 import { persistOutgoingFile } from './utils/fileUpload.mjs'
 import { externalHttpUrl } from './utils/updateDownload.mjs'
 import { databaseReady } from './database/ADB'
+import { loadTextOutbox, saveTextDraft, removeTextDraft } from './database/TextOutboxModel'
 
 const NODE_ENV = process.env.NODE_ENV
 
@@ -114,6 +115,20 @@ const onTopChatSession = () => {
  * 获取聊天
  */
 const onLoadChatMessage = () => {
+  ipcMain.handle('textOutbox:load', async (e, { userId }) => {
+    await databaseReady
+    if (userId !== store.getUserId()) return []
+    return loadTextOutbox()
+  })
+  ipcMain.handle('textOutbox:save', async (e, { userId, draft }) => {
+    if (userId !== store.getUserId()) throw new Error('登录账号已变化')
+    if (!draft || typeof draft.clientMessageId !== 'string' || draft.clientMessageId.length > 64 || typeof draft.messageContent !== 'string' || !draft.messageContent.trim() || draft.messageContent.length > 500) throw new Error('无效的待发消息')
+    await saveTextDraft(draft)
+  })
+  ipcMain.handle('textOutbox:remove', async (e, { userId, clientMessageId }) => {
+    if (userId !== store.getUserId()) throw new Error('登录账号已变化')
+    await removeTextDraft(clientMessageId)
+  })
   ipcMain.handle('cacheChatHistory', async (e, { userId, messages }) => {
     if (userId !== store.getUserId() || !Array.isArray(messages)) return false
     await saveMessageBatch(messages)

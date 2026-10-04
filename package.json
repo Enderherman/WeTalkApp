@@ -22,6 +22,7 @@
     "test:history": "node --test tests/historyPaging.test.mjs",
     "test:read-cursor": "node --test tests/readCursor.test.mjs",
     "test:ai": "node --test tests/aiMessages.test.mjs tests/messageText.test.mjs",
+    "test:outbox": "node --test tests/textOutbox.test.mjs tests/sqliteMessageCache.test.mjs",
     "postinstall": "electron-builder install-app-deps",
     "build:win": "npm run build && electron-builder --win --config",
     "build:mac": "npm run build && electron-builder --mac --config",

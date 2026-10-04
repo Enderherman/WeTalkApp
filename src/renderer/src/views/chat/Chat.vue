@@ -100,10 +100,18 @@
               ></ChatMessage>
             </template>
           </div>
+          <div v-for="draft in outboxState.items.filter((item) => item.contactId === currentChatSession.contactId)" :key="draft.clientMessageId" class="pending-message">
+            <div>{{ draft.messageContent }}</div>
+            <small>{{ draft.status === 'sending' ? '正在发送…' : draft.status === 'failed' ? draft.error : '等待联网发送' }}</small>
+            <button v-if="draft.status === 'failed'" type="button" @click="outbox.retry(draft.clientMessageId)">重试</button>
+            <button v-if="draft.status !== 'sending'" type="button" @click="outbox.discard(draft.clientMessageId)">取消发送</button>
+          </div>
+          <p v-if="outboxState.error" role="alert">{{ outboxState.error }}</p>
         </div>
         <!--输入框-->
         <MessageSend
           :current-chat-session="currentChatSession"
+          :queue-text="queueTextMessage"
           @send-message4-local="sendMessage4LocalHandler"
         ></MessageSend>
       </div>
@@ -147,6 +155,8 @@ import { createHistoryPager, mergeHistoryMessages } from '@/utils/historyPaging.
 import { useUserInfoStore } from '@/stores/UserInfoStore'
 import { createReadCursorWriter, canMarkVisibleSession } from '@/utils/readCursor.mjs'
 import { createAiStopper } from '@/utils/aiMessages.mjs'
+import { createTextOutbox } from '@/utils/textOutbox.mjs'
+import Message from '@/plugin/Message'
 
 const route = useRoute()
 const userInfoStore = useUserInfoStore()
@@ -190,6 +200,43 @@ let distanceToBottom = 0
 const currentChatSession = ref({})
 //消息列表
 const messageList = ref([])
+const outboxState = reactive({ items: [], online: true, ready: false, error: '' })
+const outboxUserId = userInfoStore.getInfo().userId
+const outbox = createTextOutbox({
+  state: outboxState,
+  storage: {
+    load: () => window.ipcRenderer.invoke('textOutbox:load', { userId: outboxUserId }),
+    put: (draft) => window.ipcRenderer.invoke('textOutbox:save', { userId: outboxUserId, draft: { ...draft } }),
+    remove: (clientMessageId) => window.ipcRenderer.invoke('textOutbox:remove', { userId: outboxUserId, clientMessageId })
+  },
+  send: async (draft) => {
+    let failure
+    const result = await Request({ url: Api.sendMessage, params: { contactId: draft.contactId, messageContent: draft.messageContent, messageType: 2, clientMessageId: draft.clientMessageId }, showLoading: false, showError: false, errorCallback: (error) => { failure = error.message } })
+    if (!result) {
+      const error = new Error(failure || '消息发送失败，请检查连接后重试')
+      error.retryable = !failure
+      throw error
+    }
+    return result.data
+  },
+  onSent: async (message, draft) => {
+    const saved = { ...message, contactId: draft.contactId, sessionId: draft.sessionId }
+    window.ipcRenderer.send('addChatMessage', saved)
+    sendMessage4LocalHandler(saved)
+  }
+})
+let outboxReady = Promise.resolve()
+const queueTextMessage = async (messageContent) => {
+  const { contactId, sessionId } = currentChatSession.value
+  try {
+    await outboxReady
+    if (!outboxState.ready) throw new Error('待发消息缓存不可用，请重新登录后重试')
+    await outbox.enqueue({ contactId, sessionId, messageContent })
+    return true
+  }
+  catch (error) { Message.error(error.message || '无法保存待发消息，请重试'); return false }
+}
+const onConnectionState = (event, state) => { void outbox.setOnline(state === 'connected') }
 let chatDisposed = false
 const aiState = reactive({ stoppingId: null, errors: {} })
 const stopAiMessage = createAiStopper({
@@ -343,6 +390,7 @@ const onReceiveMessage = () => {
       return
     }
     if (message.messageType === 0) {
+      void outbox.setOnline(true)
       loadChatSession()
       loadContactApply()
       void readWriter.retry()
@@ -511,7 +559,10 @@ const retryFileMessage = (message) => {
  * 处理发送消息 接收到了信息
  */
 const sendMessage4LocalHandler = (messageObj) => {
-  messageList.value.push(messageObj)
+  if (currentChatSession.value.sessionId === messageObj.sessionId) {
+    messageList.value = mergeHistoryMessages(messageList.value, [messageObj])
+    scrollToBottom()
+  }
   const chatSession = chatSessionList.value.find((item) => {
     return item.sessionId === messageObj.sessionId
   })
@@ -560,6 +611,8 @@ const onReloadChatSession = () => {
 }
 
 onMounted(() => {
+  window.ipcRenderer.on('connectionState', onConnectionState)
+  outboxReady = outbox.load().catch((error) => { outboxState.error = '无法加载待发消息：' + error.message })
   window.addEventListener('focus', syncVisibleSession)
   window.addEventListener('blur', syncVisibleSession)
   document.addEventListener('visibilitychange', syncVisibleSession)
@@ -598,6 +651,8 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  outbox.dispose()
+  window.ipcRenderer.removeListener('connectionState', onConnectionState)
   chatDisposed = true
   readWriter.dispose()
   window.removeEventListener('focus', syncVisibleSession)
@@ -752,6 +807,8 @@ watch(
 </script>
 
 <style scoped lang="less">
+.pending-message { text-align: right; padding: 12px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.pending-message small { display: block; color: #667085; margin-top: 4px; }
 .drag-panel {
   height: 25px;
   background: #f7f7f7;

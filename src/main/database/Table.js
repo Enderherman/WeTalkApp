@@ -1,4 +1,5 @@
 const add_table = [
+  'CREATE TABLE IF NOT EXISTS text_outbox(user_id varchar NOT NULL, client_message_id varchar NOT NULL, contact_id varchar, session_id varchar, message_content varchar, created_at bigint, status varchar, error varchar, retryable integer default 0, PRIMARY KEY(user_id, client_message_id));',
   'create table if not exists chat_message(' +
     'user_id varchar not null,' +
     'message_id bigint not null default null,' +
