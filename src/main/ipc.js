@@ -1,4 +1,4 @@
-import { BrowserWindow, ipcMain, shell } from 'electron'
+import { BrowserWindow, ipcMain as nativeIpcMain, shell } from 'electron'
 
 import store from './store'
 import { getDesktopRendererOrigin } from './utils/desktopRendererOrigin'
@@ -39,6 +39,8 @@ import { externalHttpUrl } from './utils/updateDownload.mjs'
 import { databaseReady } from './database/ADB'
 import { loadTextOutbox, saveTextDraft, removeTextDraft } from './database/TextOutboxModel'
 import { clearDesktopSession } from './utils/sessionLifecycle.mjs'
+import { createTrustedIpcMain, protectDesktopWindow } from './utils/windowSecurity.mjs'
+const ipcMain = createTrustedIpcMain(nativeIpcMain)
 
 const NODE_ENV = process.env.NODE_ENV
 
@@ -73,15 +75,14 @@ const winTitleOp = (callback) => {
 //测试
 const onSetLocalStore = () => {
   ipcMain.on('setLocalStore', (e, { key, val }) => {
+    if (!['prodDomain', 'devDomain', 'prodWsDomain', 'devWsDomain'].includes(key)) return
     store.setData(key, val)
-
-    console.log('六百六十六', store.getData(key))
   })
 }
 
 const onGetLocalStore = () => {
   ipcMain.on('getLocalStore', (e, key) => {
-    console.log('获取渲染进程的获取事件key:', key)
+    if (key !== 'devWsDomain' && key !== `${store.getUserId()}localServerPort`) return
     e.sender.send('getLocalStoreCallback', store.getData(key))
   })
 }
@@ -234,11 +235,14 @@ const openWindow = ({ windowId, title = 'WeTalk', path, width = 960, height = 72
       webPreferences: {
         preload: join(__dirname, '../preload/index.js'),
         sandbox: false,
-        contextIsolation: false
+        contextIsolation: true,
+        nodeIntegration: false
       }
     })
     saveWindow(windowId, newWindow)
     newWindow.setMinimumSize(600, 484)
+    const entryUrl = is.dev && process.env['ELECTRON_RENDERER_URL'] ? process.env['ELECTRON_RENDERER_URL'] : `${getDesktopRendererOrigin()}/index.html`
+    protectDesktopWindow(newWindow.webContents, entryUrl, (url) => shell.openExternal(url))
     if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
       newWindow.loadURL(`${process.env['ELECTRON_RENDERER_URL']}/index.html#${path}`)
     } else {

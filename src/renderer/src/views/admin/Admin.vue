@@ -30,6 +30,8 @@ const router = useRouter()
 const route = useRoute()
 
 import { useGlobalInfoStore } from '@/stores/GlobalInfoStore'
+import { useIpcListeners } from '@/composables/useIpcListeners'
+const ipc = useIpcListeners()
 
 const globalInfoStore = useGlobalInfoStore()
 
@@ -71,15 +73,12 @@ const menuJump = (item) => {
 }
 
 onMounted(() => {
-  window.ipcRenderer.on('pageInitData', (e, data) => {
+  ipc.on('pageInitData', (e, data) => {
     localStorage.setItem('token', data.token)
     globalInfoStore.setInfo('localServerPort', data.localServerPort)
   })
 })
 
-onUnmounted(() => {
-  window.ipcRenderer.removeAllListeners('pageInitData')
-})
 </script>
 
 <style scoped lang="less">

@@ -1,5 +1,11 @@
 # WeTalkApp
 
+## Electron IPC 隔离（2026-10-04）
+
+- 主/子窗口启用 context isolation，渲染器仅获得白名单 `send/invoke/on`；回调不携带原生事件，订阅返回清理函数并随组件卸载。
+- 主进程验证通道、窗口主 frame 和页面 origin，阻断外部导航/重定向/webview；本地存储通道无法任意读取其他账号 token。
+- `npm run test:ipc-security` 5 项回归覆盖桥行为、事件脱敏、监听清理、导航和全部现有通道；详见 `docs/ipc-security.md`。
+
 ## 消息时间分隔（2026-10-04）
 
 - 首条、第二条跨五分钟及跨日期消息正确显示时间分隔；昨天/历史日期保留具体时分，跨月/跨年不再误算。

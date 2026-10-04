@@ -51,6 +51,8 @@ import { useRoute, useRouter } from 'vue-router'
 import Confirm from '@/utils/Confirm'
 import { useContactStateStore } from '@/stores/ContactStateStore'
 import { validateRemark, applyContactRemark } from '@/utils/contactRemark.mjs'
+import { useIpcListeners } from '@/composables/useIpcListeners'
+const ipc = useIpcListeners()
 
 const contactStoreState = useContactStateStore()
 const route = useRoute()
@@ -158,8 +160,7 @@ const saveRemark = async () => {
 const onRemarkMessage = (event, message) => {
   if (message.messageType === 18) applyContactRemark(userInfo.value, message.extentData)
 }
-onMounted(() => window.ipcRenderer.on('receiveMessage', onRemarkMessage))
-onUnmounted(() => window.ipcRenderer.removeListener('receiveMessage', onRemarkMessage))
+onMounted(() => ipc.on('receiveMessage', onRemarkMessage))
 watch(
   () => route.query.contactId,
   (newVal, oldVal) => {

@@ -38,7 +38,7 @@ import { ensureAppDirectories } from './utils/platformUtils'
 import { startDesktopApiServer } from './utils/desktopApiServer.mjs'
 import { setDesktopRendererOrigin } from './utils/desktopRendererOrigin'
 import { closeWs } from './wsClient'
-import { externalHttpUrl } from './utils/updateDownload.mjs'
+import { protectDesktopWindow } from './utils/windowSecurity.mjs'
 
 let desktopApiServer = null
 const hasDevRenderer = is.dev && Boolean(process.env['ELECTRON_RENDERER_URL'])
@@ -72,7 +72,8 @@ function createWindow() {
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       sandbox: false,
-      contextIsolation: false
+      contextIsolation: true,
+      nodeIntegration: false
     }
   })
 
@@ -83,11 +84,8 @@ function createWindow() {
     mainWindow.setTitle('微语')
   })
 
-  mainWindow.webContents.setWindowOpenHandler((details) => {
-    const url = externalHttpUrl(details.url)
-    if (url) shell.openExternal(url)
-    return { action: 'deny' }
-  })
+  const entryUrl = hasDevRenderer ? process.env['ELECTRON_RENDERER_URL'] : `${desktopApiServer?.origin}/index.html`
+  protectDesktopWindow(mainWindow.webContents, entryUrl, (url) => shell.openExternal(url))
 
   // HMR for renderer base on electron-vite cli.
   // Load the remote URL for development or the local html file for production.

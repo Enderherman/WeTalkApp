@@ -64,6 +64,8 @@ import { useMessageCountStore } from '@/stores/MessageCountStore'
 import { useAvatarInfoStore } from '@/stores/AvatarUploadStore'
 import Update from '@/views/Update.vue'
 import { clearRendererSession } from '@/utils/routeAccess.mjs'
+import { useIpcListeners } from '@/composables/useIpcListeners'
+const ipc = useIpcListeners()
 
 const messageCountStore = useMessageCountStore()
 const userInfoStore = useUserInfoStore()
@@ -134,13 +136,13 @@ const menuSelect = (path) => {
 onMounted(() => {
   getLoginInfo()
   getSystemSetting()
-  window.ipcRenderer.on('systemSettingsUpdated', getSystemSetting)
-  window.ipcRenderer.on('getLocalStoreCallback', (e, serverPort) => {
+  ipc.on('systemSettingsUpdated', getSystemSetting)
+  ipc.on('getLocalStoreCallback', (e, serverPort) => {
     globalInfoStore.setInfo('localServerPort', serverPort)
   })
 
   //退出登录跳转到登录界面
-  window.ipcRenderer.on('reLogin', () => {
+  ipc.on('reLogin', () => {
     clearRendererSession(localStorage, [userInfoStore, globalInfoStore, sysSettingStore, messageCountStore, avatarInfoStore])
     router.replace('/login')
   })
@@ -156,11 +158,6 @@ watch(
   { immediate: true, deep: true }
 )
 
-onUnmounted(() => {
-  window.ipcRenderer.removeListener('systemSettingsUpdated', getSystemSetting)
-  window.ipcRenderer.removeAllListeners('getLocalStoreCallback')
-  window.ipcRenderer.removeAllListeners('reLogin')
-})
 </script>
 
 <style scoped lang="less">

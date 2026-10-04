@@ -150,6 +150,8 @@ import Message from '@/plugin/Message'
 import { ref, nextTick, onMounted, onUnmounted } from 'vue'
 import md5 from 'js-md5'
 import { useUserInfoStore } from '@/stores/UserInfoStore'
+import { useIpcListeners } from '@/composables/useIpcListeners'
+const ipc = useIpcListeners()
 
 const userInfoStore = useUserInfoStore()
 import { useRouter } from 'vue-router'
@@ -385,7 +387,7 @@ const init = () => {
   window.ipcRenderer.send('setLocalStore', { key: 'devWsDomain', val: Api.devWsDomain })
   window.ipcRenderer.send('loadLocalUser')
 
-  window.ipcRenderer.on('loadLocalUserCallback', (event, userList) => {
+  ipc.on('loadLocalUserCallback', (event, userList) => {
     localUserList.value = userList
   })
 }
@@ -401,7 +403,6 @@ onMounted(() => {
 
 onUnmounted(() => {
   stopEmailCodeCountdown()
-  window.ipcRenderer.removeAllListeners('loadLocalUserCallback')
 })
 </script>
 

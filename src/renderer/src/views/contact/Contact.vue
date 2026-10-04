@@ -74,6 +74,8 @@ import Badge from '@/components/Badge.vue'
 import SearchResult from '@/views/chat/SearchResult.vue'
 import { highlightText } from '@/utils/messageText.mjs'
 import { applyContactRemark, contactDisplayName } from '@/utils/contactRemark.mjs'
+import { useIpcListeners } from '@/composables/useIpcListeners'
+const ipc = useIpcListeners()
 
 const contactStateStore = useContactStateStore()
 const messageCountStore = useMessageCountStore()
@@ -264,8 +266,7 @@ const onRemarkMessage = (event, message) => {
     })
   })
 }
-onMounted(() => window.ipcRenderer.on('receiveMessage', onRemarkMessage))
-onUnmounted(() => window.ipcRenderer.removeListener('receiveMessage', onRemarkMessage))
+onMounted(() => ipc.on('receiveMessage', onRemarkMessage))
 
 watch(
   () => contactStateStore.contactReload,

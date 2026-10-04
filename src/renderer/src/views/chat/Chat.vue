@@ -199,6 +199,8 @@ import { createTextOutbox } from '@/utils/textOutbox.mjs'
 import Message from '@/plugin/Message'
 import { createHistorySearch } from '@/utils/historySearch.mjs'
 import { shouldShowMessageTime } from '@/utils/messageTime.mjs'
+import { useIpcListeners } from '@/composables/useIpcListeners'
+const ipc = useIpcListeners()
 
 const route = useRoute()
 const userInfoStore = useUserInfoStore()
@@ -483,7 +485,7 @@ const receiveAiStreamMessage = (message) => {
 }
 
 const onReceiveMessage = () => {
-  window.ipcRenderer.on('receiveMessage', (event, message) => {
+  ipc.on('receiveMessage', (event, message) => {
     if (message.messageType === 18) {
       chatSessionList.value.forEach((item) => applyContactRemark(item, message.extentData))
       applyContactRemark(currentChatSession.value, message.extentData)
@@ -594,7 +596,7 @@ const onReceiveMessage = () => {
  * 接受会话信息
  */
 const onLoadChatSession = () => {
-  window.ipcRenderer.on('loadChatSessionCallback', (event, data) => {
+  ipc.on('loadChatSessionCallback', (event, data) => {
     let noReadCount = 0
     data.forEach((item) => {
       noReadCount = noReadCount + item.noReadCount
@@ -610,7 +612,7 @@ const onLoadChatSession = () => {
  * 接受记录信息
  */
 const onLoadChatMessage = () => {
-  window.ipcRenderer.on('loadChatMessageCallback', (event, { dataList, pageTotal, pageNo, sessionId }) => {
+  ipc.on('loadChatMessageCallback', (event, { dataList, pageTotal, pageNo, sessionId }) => {
     if (sessionId !== currentChatSession.value.sessionId) return
     if (pageNo === pageTotal) {
       messagePageInfo.noData = true
@@ -638,7 +640,7 @@ const onLoadChatMessage = () => {
 }
 
 const onAddChatMessage = () => {
-  window.ipcRenderer.on('addChatMessageCallback', (event, { status, messageId, error }) => {
+  ipc.on('addChatMessageCallback', (event, { status, messageId, error }) => {
     const findMessage = messageList.value.find((item) => {
       return item.messageId === messageId
     })
@@ -698,13 +700,13 @@ const loadContactApply = () => {
 }
 
 const onLoadContactApply = () => {
-  window.ipcRenderer.on('loadContactApplyCallback', (e, contactNoRead) => {
+  ipc.on('loadContactApplyCallback', (e, contactNoRead) => {
     messageCountStore.setCount('contactApplyCount', contactNoRead, true)
   })
 }
 
 const onReloadChatSession = () => {
-  window.ipcRenderer.on('reloadChatSessionCallback', (e, { contactId, chatSessions }) => {
+  ipc.on('reloadChatSessionCallback', (e, { contactId, chatSessions }) => {
     sortChatSession(chatSessions)
     chatSessionList.value = chatSessions
     messageCountStore.setCount('chatCount', chatSessions.reduce((count, item) => count + (item.noReadCount || 0), 0), true)
@@ -713,7 +715,7 @@ const onReloadChatSession = () => {
 }
 
 onMounted(() => {
-  window.ipcRenderer.on('connectionState', onConnectionState)
+  ipc.on('connectionState', onConnectionState)
   outboxReady = outbox.load().catch((error) => { outboxState.error = '无法加载待发消息：' + error.message })
   window.addEventListener('focus', syncVisibleSession)
   window.addEventListener('blur', syncVisibleSession)
@@ -755,19 +757,12 @@ onMounted(() => {
 onUnmounted(() => {
   closeHistorySearch()
   outbox.dispose()
-  window.ipcRenderer.removeListener('connectionState', onConnectionState)
   chatDisposed = true
   readWriter.dispose()
   window.removeEventListener('focus', syncVisibleSession)
   window.removeEventListener('blur', syncVisibleSession)
   document.removeEventListener('visibilitychange', syncVisibleSession)
   historyPager.dispose()
-  window.ipcRenderer.removeAllListeners('receiveMessage')
-  window.ipcRenderer.removeAllListeners('loadChatSessionCallback')
-  window.ipcRenderer.removeAllListeners('loadChatMessageCallback')
-  window.ipcRenderer.removeAllListeners('addChatMessageCallback')
-  window.ipcRenderer.removeAllListeners('loadContactApplyCallback')
-  window.ipcRenderer.removeAllListeners('reloadChatSessionCallback')
 })
 
 onActivated(() => {

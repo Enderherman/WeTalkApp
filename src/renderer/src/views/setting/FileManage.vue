@@ -24,6 +24,8 @@
 
 <script setup>
 import { onMounted, ref } from 'vue'
+import { useIpcListeners } from '@/composables/useIpcListeners'
+const ipc = useIpcListeners()
 
 const formData = ref({})
 const formDataRef = ref()
@@ -49,14 +51,14 @@ const openLocalFolder = () => {
 
 onMounted(() => {
   getSysSetting()
-  window.ipcRenderer.on('getSysSettingCallback', (event, sysSetting) => {
+  ipc.on('getSysSettingCallback', (event, sysSetting) => {
     copying.value = false
     sysSetting = JSON.parse(sysSetting)
     formData.value = {
       sysSetting: sysSetting.localFileFolder
     }
   })
-  window.ipcRenderer.on('copyCallback', (event) => {
+  ipc.on('copyCallback', (event) => {
     copying.value = true
   })
 })

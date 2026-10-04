@@ -72,6 +72,8 @@ import DPlayer from 'dplayer'
 import 'viewerjs/dist/viewer.css'
 import { component as Viewer } from 'v-viewer'
 import Utils from '../../utils/Utils'
+import { useIpcListeners } from '@/composables/useIpcListeners'
+const ipc = useIpcListeners()
 
 const localServerPort = ref()
 const currentIndex = ref(1)
@@ -160,7 +162,7 @@ const closeWin = () => {
 
 onMounted(() => {
   initPlayer()
-  window.ipcRenderer.on('pageInitData', (event, data) => {
+  ipc.on('pageInitData', (event, data) => {
     allFileList.value = data.fileList
     localServerPort.value = data.localServerPort
     let index = 0
@@ -175,7 +177,6 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
-  window.ipcRenderer.removeAllListeners('pageInitData')
 })
 
 const getCurrentFile = () => {

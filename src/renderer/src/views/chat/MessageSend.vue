@@ -88,6 +88,8 @@ import { useUserInfoStore } from '@/stores/UserInfoStore'
 import { useSysSettingStore } from '@/stores/SystemSettingStore'
 import SearchAdd from '@/views/contact/SearchAdd.vue'
 import { validateChatUpload } from '@/utils/uploadValidation.mjs'
+import { useIpcListeners } from '@/composables/useIpcListeners'
+const ipc = useIpcListeners()
 
 const userInfoStore = useUserInfoStore()
 const sysSettingStore = useSysSettingStore()
@@ -337,7 +339,7 @@ const pasteFile = async (event) => {
 }
 
 onMounted(() => {
-  window.ipcRenderer.on('saveClipBoardFileCallback', (event, file) => {
+  ipc.on('saveClipBoardFileCallback', (event, file) => {
     console.log('saveClipBoardFileCallback', file)
     const fileType = 0
     sendMessageDo(
@@ -353,9 +355,6 @@ onMounted(() => {
       false
     )
   })
-})
-onUnmounted(()=>{
-  window.ipcRenderer.removeAllListeners('saveClipBoardFileCallback')
 })
 </script>
 

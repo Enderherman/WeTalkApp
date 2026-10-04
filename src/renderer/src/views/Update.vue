@@ -37,6 +37,8 @@ import { onMounted, onUnmounted, ref } from 'vue'
 import { useUserInfoStore } from '@/stores/UserInfoStore'
 import Confirm from '@/utils/Confirm'
 import Message from '@/plugin/Message'
+import { useIpcListeners } from '@/composables/useIpcListeners'
+const ipc = useIpcListeners()
 
 const userInfoStore = useUserInfoStore()
 
@@ -127,7 +129,7 @@ onMounted(() => {
   if (props.autoUpdate) {
     checkUpdateAuto(true)
   }
-  window.ipcRenderer.on('downloadUpdateCallback', (event, state) => {
+  ipc.on('downloadUpdateCallback', (event, state) => {
     if (state.error) {
       downloading.value = false
       Message.error(state.error)
@@ -135,9 +137,6 @@ onMounted(() => {
     }
     downloadPercent.value = state
   })
-})
-onUnmounted(() => {
-  window.ipcRenderer.removeAllListeners('downloadUpdateCallback')
 })
 defineExpose({
   checkUpdate
