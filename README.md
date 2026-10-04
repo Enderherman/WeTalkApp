@@ -1,191 +1,48 @@
 # WeTalkApp
 
-## 搜索结果发消息入口（2026-10-04）
+WeTalkApp 是 WeTalk 的 Electron 桌面客户端，使用 Vue 3、Vite、Pinia 和 Element Plus。客户端通过共享后端的 HTTP API 与 WebSocket 同步聊天，在本机按账号保存 SQLite 缓存、待发文字和媒体文件。
 
-- 补齐搜索结果中已是好友/已加入群的“发送消息”动作，按已有详情页方式跳转真实 `/chat?chatId=...`，不创建虚构会话或发送占位消息。
-- 清除图片组件未定义的冗余点击引用，保留外层聊天预览和头像预览的事件冒泡。
-- `npm run test:contact-search-actions` 4项实际Vue组件事件/真实memory router回归通过；好友与群入口修改前均复现未绑定，修复后导航且只发起搜索请求。
+仓库：[Enderherman/WeTalkApp](https://github.com/Enderherman/WeTalkApp)。浏览器客户端 [WeTalkWeb](https://github.com/Enderherman/WeTalkWeb) 是独立项目。
 
-## 好友申请拉黑入口（2026-10-04）
+当前包版本为 `1.0.0`。已核验的 Windows 安装包是默认本机后端目标的测试产物，未发布 GitHub Release、未安装或运行该安装包、未部署到 NAS；正式域名尚未配置。源码快照与产物哈希见[安装包核验](docs/windows-package-verification.md)，版本更新统一记录在 [CHANGELOG.md](CHANGELOG.md)。
 
-- 修复申请列表“拉黑”误传status=4的问题，改为后端协议的3；仍在用户确认后提交并刷新已处理状态。
-- `npm run test:contact-apply-actions` 编译真实ContactApply组件并点击渲染菜单、执行确认回调，验证实际Request参数和处理后页面；修改前复现4，修改后通过3及“已拉黑”回读。
+## 当前功能
 
-## 同账号多端消息与文件完成同步（2026-10-04）
+| 范围       | 能力                                                                                                           |
+| ---------- | -------------------------------------------------------------------------------------------------------------- |
+| 账号       | 邮箱验证码注册、登录、资料与头像、修改密码、退出；查看登录设备、撤销指定其他设备或退出全部其他设备             |
+| 联系人     | ID、邮箱和昵称搜索；好友申请、同意、拒绝、拉黑；备注、删除和黑名单；已有好友或已加入群可从搜索结果进入聊天     |
+| 群聊       | 创建与编辑群资料、头像和封面、成员管理、退出与解散；按群主和管理员权限限制操作                                 |
+| 会话       | 本机置顶、移除与恢复；移除保留聊天记录，新消息到达自动恢复；服务器历史分页与本机断网缓存                       |
+| 消息       | 文字、文件、图片、音频、视频；当前或全部会话完整历史搜索、附件名检索、高亮和原消息定位                         |
+| 同步与发送 | 同账号镜像、去重、附件完成状态、已读游标与私聊回执；文字持久待发队列、重连重放、失败重试或取消；附件原消息重试 |
+| AI         | 累计流式回复、思考与生成状态、停止生成、完成/停止/失败状态缓存                                                 |
+| 管理       | 用户和群管理、系统配额与机器人设置、靓号、版本草稿及灰度/公开发布管理界面                                      |
+| 桌面       | 文件选择、拖入与粘贴，媒体预览和下载，本地目录设置，托盘和窗口控制，更新包下载                                 |
 
-- 对接本人文字/文件/AI提问镜像，HTTP接受与WebSocket回显按消息ID合并；回显按clientMessageId确认待发草稿，HTTP后到或超时不会出现第二条/复活已发送草稿。
-- type 6 使用完整最终文件名、大小、类型和状态更新气泡与SQLite，历史类型保持5；不增加未读，也不把新会话预览回退到较早附件。
-- SQLite按账号/消息串行合并，已完成的文件不会被迟到placeholder或失败回调覆盖；新旧库迁移保留clientMessageId。
-- `npm run test:message-mirror` 20项相关回归通过，详见 `docs/multi-device-message-sync.md`；真实双端镜像由隔离环境另行验收。
+聊天文本以文本节点渲染，搜索按字面匹配。已读只在聊天页面可见且窗口聚焦时提交；本人消息镜像和文件完成通知不增加未读。
 
-## Electron IPC 隔离（2026-10-04）
+## 环境与安装
 
-- 主/子窗口启用 context isolation，渲染器仅获得白名单 `send/invoke/on`；回调不携带原生事件，订阅返回清理函数并随组件卸载。
-- 主进程验证通道、窗口主 frame 和页面 origin，阻断外部导航/重定向/webview；本地存储通道无法任意读取其他账号 token。
-- `npm run test:ipc-security` 5 项回归覆盖桥行为、事件脱敏、监听清理、导航和全部现有通道；详见 `docs/ipc-security.md`。
-
-## 消息时间分隔（2026-10-04）
-
-- 首条、第二条跨五分钟及跨日期消息正确显示时间分隔；昨天/历史日期保留具体时分，跨月/跨年不再误算。
-- `npm run test:message-time` 2 项时间边界回归通过。
-
-## 会话移除与恢复（2026-10-04）
-
-- 本机移除/置顶偏好在重连和重新登录后保留；新消息到达时恢复显示，与 Web 的会话偏好行为一致。
-- “已移除”入口可主动恢复；明确移除不删除聊天记录，并修复移除/恢复未读徽章与误清其他选中会话的问题。
-- 真实 SQLite 新库/旧库回归验证移除保留、置顶保留、手动恢复及新消息恢复。
-
-## 联系人申请分页（2026-10-04）
-
-- 修复滚动申请列表始终重复请求第一页的问题；页码正确提交、结果按申请 ID 去重，失败保留页码便于重试。
-- 新申请和处理完成会刷新第一页，旧请求不能覆盖新结果；保留明确“加载更多”入口。
-- `npm run test:contact-applications` 3 项分页/失败/刷新竞争回归通过。
-
-## 群成员操作确认（2026-10-04）
-
-- 成员添加/移除等待服务器成功后才关窗，失败保留选择并提示重试；提交中防止重复操作。
-- 移除列表按群主 ID 排除本人，不依赖服务端成员排序；联系人选择显示/搜索备注，群消息使用正确的发送者昵称字段。
-- `npm run test:group-members` 3 项行为回归，以及实际 Vue 群昵称渲染回归通过。
-
-## 上传上限与头像选择（2026-10-04）
-
-- 聊天附件与 Web 使用相同硬上限：图片 200 MiB，音视频/普通文件 499 MiB（为默认 500 MB multipart 请求上限保留开销）；继续取管理员配置与硬上限较小值，不更改后台配置。
-- 头像校验格式/MIME/10 MiB 上限，预览采用正确 PNG 类型；使用请求独立的 IPC 回复，避免多个头像组件互相替换或旧响应覆盖新选择。
-- `npm run test:upload-validation` 3 项参数化/异步回归通过。
-
-## 管理员系统设置校验（2026-10-04）
-
-- 五项配额统一限制为正整数，修正 `maxFileSize` 校验字段拼写；机器人昵称/欢迎语去除首尾空白并校验长度。
-- 保存成功后通知主聊天窗口刷新配额与机器人设置，防止继续使用旧限制；保存中禁止重复提交。
-- `npm run test:settings` 2 项参数化回归覆盖所有配额的零/负数/小数/空值/溢出，以及机器人文案和头像保留。
-
-## 会话清理、访问与错误处理（2026-10-04）
-
-- 退出/过期统一清理 token、用户状态、未读状态、管理员子窗口和托盘角色；普通用户不能通过路由或窗口入口打开管理页面。
-- 请求独立管理加载状态，网络错误会关闭遮罩；过时账号的响应不会覆盖新登录账号。multipart 使用真实边界，未重选头像时省略旧头像 ID。
-- 实时断线显示恢复状态，重试耗尽后可主动重新连接；断线时检查会话是否被撤销。
-- 修复生产构建用 `npm start`/Electron 直接预览时误判为开发模式并立即退出：只有存在真实开发服务器地址时才跳过本地页面服务。
-- `npm run test:session` 7 项回归包含退出副作用、路由权限、陈旧响应、错误遮罩与真实 multipart HTTP。
-
-## 完整历史搜索与定位（2026-10-04）
-
-- “记录”入口可搜索当前或全部会话的服务器完整历史，支持消息正文/附件名、关键词高亮和逐页进度；可停止检索。
-- 选择结果会加载连续历史并定位原消息；无权限/已移除会话明确提示结果不完整，避免把部分扫描当完整结果。
-- `npm run test:history-search` 3 项回归覆盖多会话全部分页、取消/陈旧结果和异常分页终止。
-
-## 文字幂等重试与离线发送（2026-10-04）
-
-- 每条文字消息先保存到按账号隔离的 SQLite 待发队列，再携带稳定 `clientMessageId` 发送；断线重连自动顺序重放，超时重试沿用原键。
-- 聊天显示待发/发送中/失败状态，支持手动重试和取消发送；应用重开可恢复未完成草稿，退出账号后陈旧响应不会进入新账号。
-- 发送控件防重复提交，并避开中文输入法组合态的 Enter；只有本地保存成功才清空输入。
-- `npm run test:outbox` 7 项回归覆盖重放、失败顺序、重启恢复、账号退出及实际 SQLite 持久化。
-
-## AI 停止生成与状态展示（2026-10-04）
-
-- AI 思考/生成中可停止，停止失败保留原回复并允许重试；采用服务器返回的完成/停止/失败状态并写回缓存。
-- 流式内容在生成时即可显示，不再被骨架屏遮挡；历史机器人消息同样恢复终态。
-- `npm run test:ai` 8 项状态、停止 API 和实际 Vue 模板回归通过。
-
-## 持久已读与私聊回执（2026-10-04）
-
-- 可见且聚焦的聊天会话将已读游标提交到后端并落本地缓存；后台、失焦和切去联系人/设置时不误报已读。
-- 游标只前进不回退，提交失败在重新连接/聚焦后重试；私聊发送气泡根据对端回执显示“已读”。
-- `npm run test:read-cursor` 3 项回归及 SQLite 新/旧库游标测试通过。
-
-## 服务器历史分页（2026-10-04）
-
-- 桌面聊天打开会话和上翻时读取服务器游标历史，换电脑也能加载更早记录；结果同步到按账号隔离的 SQLite 缓存。
-- 断网时回退本地缓存并提供重载提示；切换会话会丢弃旧请求结果，服务器/缓存/实时消息按 ID 去重排序。
-- `npm run test:history` 3 项回归验证分页游标、终止条件、陈旧请求隔离和本地文件路径保留。
-
-## 登录设备管理（2026-10-04）
-
-- 设置新增“登录设备”：显示设备名称、类别、登录时间/最近活动和当前设备，支持刷新、撤销其他单设备及退出全部其他设备。
-- 当前设备通过原有退出登录入口退出；失败保留设备列表并显示重试提示，防止重复提交。
-- `npm run test:devices` 3 项回归覆盖目标设备撤销/刷新、当前设备保护、失败及重复提交。
-
-## 联系人备注与缓存迁移（2026-10-04）
-
-- 好友详情支持设置/清空备注（去除首尾空白，最多 40 字符）；联系人、会话标题、列表和搜索优先显示备注，并保留真实昵称。
-- 私有 type 18 事件同步同一账号其他端的备注，不创建消息或增加未读；SQLite 新旧库迁移保留备注和已读游标。
-- 登录等待 SQLite 初始化，修复回调 `this` 失效与错误 SQL 被吞掉的问题。
-- `npm run test:contact-remark` 10 项回归包含真实 SQLite 新库与旧库迁移、备注清空、名称保留和事件隔离。
-
-## 更新包下载修复（2026-10-04）
-
-- 更新包保存到独立临时目录，验证完整字节后通过系统打开安装程序；失败可重试，JSON 错误响应不会保存为安装包。
-- 修正下载进度事件名和事件参数；更新外链仅允许 HTTP/HTTPS。
-- `npm run test:update-download` 2 项回归覆盖真实本地下载、长度不匹配、错误响应、非法路径和外链协议；测试不启动真实安装程序。
-
-## 聊天文本与搜索修复（2026-10-04）
-
-- 聊天、AI 回复、会话摘要和搜索结果统一以文本节点展示；支持后端遗留换行/实体格式，消息和昵称里的 HTML 不再被执行。
-- 搜索高亮按字面匹配，`[`、`(`、`*` 等字符不会导致正则异常，支持大小写无关匹配。
-- `npm run test:message-text` 4 项测试包含真实聊天和搜索 Vue 模板的服务端渲染验证。
-
-## 文件上传与失败重试（2026-10-04）
-
-- 上传完成状态等待后端返回成功；HTTP/业务错误会显示“上传失败”，可使用同一条消息重新上传，避免重复创建附件消息。
-- 上传完成后若已切换账号，不再改写新账号的消息；文件数量控件与图片/视频/普通文件大小按具体设置字段校验，音频无视频轨时不强制生成封面。
-- `npm run test:file-upload` 的 3 项回归验证真实本地 HTTP 延迟响应、业务拒绝、失败重试及账号切换。
-
-## 实时消息可靠性修复（2026-10-04）
-
-- 文件和群系统消息保存到 SQLite 时保留原类型；AI 累计片段按到达顺序更新同一条消息，并保存结束/停止/失败状态。
-- 重复推送、AI 片段与重新连接的 INIT 不再重复增加未读；type 17 已读回执独立处理并保存对端游标。
-- 每条连接只保留一个心跳和重连定时器，退出/切换账号/退出程序时清理；旧连接和排队回调不再更新新连接。
-- `npm run test:realtime` 覆盖 10 个实际消息处理/生命周期场景。此切片尚未实现桌面主动提交已读、完整服务器历史、AI 停止按钮等后续功能；不代表真实 Electron 端到端验收完成。
-
-## 本轮功能：联系人邮箱与昵称搜索（2026-09-29）
-
-- 添加联系人可使用邮箱精确找人，也支持用户昵称和群昵称模糊搜索；多个匹配项会以列表显示并可逐个选择。
-- 桌面端通过后端 `/contact/searchByKeyword`，与 WeTalkWeb 使用同一套结果和关系状态。
-- 验证：后端 Maven `clean verify` 106 项通过，WeTalkWeb 265 项单测/类型检查/生产构建通过，WeTalkApp 生产构建通过。
-
-## NAS API 与 WebSocket 接入
-
-设置 `RENDERER_VITE_WETALK_SERVER_ORIGIN` 和 `RENDERER_VITE_WETALK_WS_ORIGIN` 后再构建，即可把桌面客户端指向 NAS。打包版启动一个只绑定 `127.0.0.1` 临时端口的本地服务：它提供渲染页面并把 `/api` 请求按流转发到配置的后端 origin，因此渲染页保持同源且继续启用 Electron `webSecurity`。WebSocket 由 Electron 主进程直接连接配置的 NAS 地址；管理员子窗口也复用同一个本地页面 origin。
-
-运行本地代理单测：
+需要 Node.js、npm 和可访问的 WeTalk 后端。MySQL、Redis、SMTP 和 AI 提供商凭据由后端管理，桌面不保存 SMTP 或 AI 密钥。已核验的 Windows 环境使用 Node.js `24.14.0`、Electron `25.9.8` 和 electron-builder `24.13.3`；实际依赖版本以锁文件为准。
 
 ```cmd
-npm run test:api-proxy
-```
-
-设置 `WETALK_SERVER_ORIGIN` 后，同一组用例还会请求真实后端 readiness 接口；测试不会创建账号或发送注册邮件。
-
-2026-09-28 NAS 目标 Windows 包 `installPackages/WeTalkAppSetup.1.0.0.exe` 构建通过。为适配 N-API 稳定 ABI，`sqlite3` 原生文件在安装包中解包到 `app.asar.unpacked`；单独的内存库查询在 Node 和 Electron Node 运行时都通过。此内测包尚未完成真实账号登录与机器人聊天流程验收。
-
-SQLite 原生绑定检查：
-
-```cmd
-npm run test:sqlite-binding
-set ELECTRON_RUN_AS_NODE=1&&node_modules\electron\dist\electron.exe --test tests\sqliteBinding.test.mjs
-```
-
-WeTalkApp 是 WeTalk 的 Electron 桌面客户端，使用 Vue 3、Vite、Pinia 和 Element Plus 构建。它通过 HTTP API 和 WebSocket 连接 wetalk 后端，并使用 Electron main/preload 提供本地文件、SQLite 缓存和桌面窗口能力。
-
-GitHub 仓库：[Enderherman/WeTalkApp](https://github.com/Enderherman/WeTalkApp)
-
-## 环境要求
-
-- Node.js 与 npm
-- Windows、macOS 或 Linux 桌面环境
-- 可访问的 wetalk 后端及其 MySQL、Redis 服务
-
-## 安装依赖
-
-```bash
 npm install
-```
-
-## 本地开发
-
-```bash
 npm run dev
 ```
 
-默认 API 和 WebSocket 指向本机后端 `127.0.0.1:5050` / `127.0.0.1:5051`。使用 NAS Docker 后端时，把 Electron 客户端指向 NAS Web 同源代理（后端端口只绑定 NAS 回环地址）：
+依赖安装会执行 `electron-builder install-app-deps`；ffmpeg-static 也需要运行安装脚本下载二进制。Vite 开发页面端口为 `5000`。当前 `dev` 脚本包含 Windows 的 `chcp` 命令；仓库提供 macOS/Linux 打包脚本，但本文的运行与安装包证据仅覆盖 Windows。
+
+注册流程为图片验证码、邮件中的 6 位验证码和账号资料。邮件投递与机器人可用性依赖共享后端配置。
+
+## 连接后端
+
+| 构建变量                             | 默认值                   | 格式                                   |
+| ------------------------------------ | ------------------------ | -------------------------------------- |
+| `RENDERER_VITE_WETALK_SERVER_ORIGIN` | `http://127.0.0.1:5050`  | HTTP(S) origin，不带 `/api` 或其他路径 |
+| `RENDERER_VITE_WETALK_WS_ORIGIN`     | `ws://127.0.0.1:5051/ws` | 完整 WebSocket URL                     |
+
+只配置 API origin 时，从该 origin 推导 `ws://` 或 `wss://` 地址并追加 `/ws`。使用 NAS 同源代理时，在同一个命令窗口设置变量再开发或构建：
 
 ```cmd
 set RENDERER_VITE_WETALK_SERVER_ORIGIN=http://<NAS-Web地址>:8081
@@ -193,23 +50,57 @@ set RENDERER_VITE_WETALK_WS_ORIGIN=ws://<NAS-Web地址>:8081/ws
 npm run dev
 ```
 
-打包前在同一命令窗口设置相同变量，再运行 `npm run build:win`、`npm run build:mac` 或 `npm run build:linux`。这两个变量会编译进安装包；API 地址填写 origin，不要追加 `/api`。本机 `.env` 文件会被 Git 忽略。浏览器版 WeTalkWeb 是独立客户端，不通过 Electron 启动。
+这些值在构建时写入产物，修改环境变量后需要重新构建。`.env`、`.env.*`、`node_modules/`、`out/`、`installPackages/` 和日志均不提交 Git。
 
-## 账号注册与 AI
+打包版及已构建预览启动仅绑定 `127.0.0.1` 临时端口的页面服务，将 `/api` 流式代理到目标后端。主窗口与管理、媒体子窗口共用可信 renderer origin；WebSocket 由主进程直接连接目标地址。存在真实 Vite 开发服务器时才跳过本地页面服务。
 
-注册使用邮箱验证码：先完成图片验证码并请求邮件验证码，再填写邮件中的 6 位验证码创建账号。App 不保存 SMTP 或 DeepSeek 凭据；邮箱发送和 AI 提供商均由共享 WeTalk 后端配置，AI 使用 DeepSeek 时由后端读取私有环境变量。AI 文本流的累计片段和结束状态由桌面聊天页合并到同一条机器人消息。
+## 开发、验证与构建
 
-## 构建桌面安装包
-
-```bash
-# Windows
-npm run build:win
-
-# macOS
-npm run build:mac
-
-# Linux
-npm run build:linux
+```cmd
+npm run build
+npm start
 ```
 
-当前 npm 包名为 wetalk-app，桌面产品显示名为 WeTalkApp。本次未调整 Electron appId。package.json 与 electron-builder.yml 目前配置的 appId 不同；下次发布安装包前应确认实际生效值，并评估已安装版本的升级兼容性。
+`build` 生成 main、preload 和 renderer，`start` 预览已构建结果。常用专项检查如下，全部命令见 [package.json](package.json)：
+
+| 范围                   | 命令                                                                                                               |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| 页面代理、SQLite       | `npm run test:api-proxy`、`npm run test:sqlite-binding`                                                            |
+| 消息与待发队列         | `npm run test:realtime`、`npm run test:message-mirror`、`npm run test:outbox`                                      |
+| 历史、搜索、已读、AI   | `npm run test:history`、`npm run test:history-search`、`npm run test:read-cursor`、`npm run test:ai`               |
+| 登录、设备、联系人、群 | `npm run test:session`、`npm run test:devices`、`npm run test:contact-remark`、`npm run test:group-members`        |
+| 可见搜索和申请入口     | `npm run test:contact-search-actions`、`npm run test:contact-apply-actions`                                        |
+| 隔离、上传与设置       | `npm run test:ipc-security`、`npm run test:file-upload`、`npm run test:upload-validation`、`npm run test:settings` |
+
+完整桌面测试：
+
+```cmd
+node --test tests/*.test.mjs
+```
+
+真实 Chromium 媒体验证需可用的 Playwright 包与浏览器，变量及命令见 [HEVC 验证](docs/hevc-processing-verification.md)。`test:api-proxy` 默认检查本地代理；显式设置 `WETALK_SERVER_ORIGIN` 才增加真实后端 readiness 检查，该检查不注册账号或发送邮件。
+
+生成 Windows 本地测试包：
+
+```cmd
+npm run build:win -- --publish never
+```
+
+产物写入 `installPackages/`。该脚本实际读取 `package.json` 的 `build` 字段，appId 为 `com.easychat`；显式指定 `electron-builder.yml` 是另一入口，appId 为 `com.electron.app`。发布或升级前需按[安装包核验](docs/windows-package-verification.md)核对配置入口与安装身份。
+
+## 已验证基线
+
+2026-10-04 在产品源码 `de22cd02250b1c374c8cfccd95727dc7a6b985c6` 上，桌面完整测试 **106 通过、0 失败、0 跳过**，显式执行真实 HEVC 和 Chromium 分支，生产构建成功。该结果属于已完成的源码验证，文档重写没有重新运行整套功能测试。
+
+真实同账号 Web/Electron 消息、文件和 AI 镜像验收使用 `a5f96bd`；最终 `de22cd0` 安装包完成静态提取、资源哈希和 57 个编译文件逐字节比对。这些证据不覆盖安装、覆盖升级或卸载。
+
+## 文档导航
+
+| 文档                                                       | 内容                                    |
+| ---------------------------------------------------------- | --------------------------------------- |
+| [更新日志](CHANGELOG.md)                                   | 对应版本的功能、修复和文档变化          |
+| [IPC 与页面隔离](docs/ipc-security.md)                     | preload 白名单、窗口来源和订阅生命周期  |
+| [本地媒体服务](docs/media-serving.md)                      | 文件路径、Range、缓存、上传名与大小限制 |
+| [跨端消息同步](docs/multi-device-message-sync.md)          | 镜像、完成事件、SQLite 合并和待发确认   |
+| [HEVC 处理验证](docs/hevc-processing-verification.md)      | 生产处理链路、账号隔离和生成媒体证据    |
+| [Windows 安装包核验](docs/windows-package-verification.md) | 生效配置、源码快照、产物哈希和验证边界  |

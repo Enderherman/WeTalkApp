@@ -1,48 +1,57 @@
-# HEVC 转码、封面和账号隔离验收
+# HEVC 处理与账号隔离验证
 
-2026-10-04。使用私有生成的64×48、10fps、1秒HEVC MP4；生成、H.264转码和缩略图处理均限制单线程/单过滤线程，未使用摄像头、真实用户媒体、硬件编码或安装程序。
+本页记录生产媒体链路及 2026-10-04 的生成媒体验证。实现由 [fileOperation.js](../src/main/fileOperation.js) 实际调用 [processOutgoingMedia](../src/main/utils/outgoingMedia.mjs) 和 [createMediaProcessors](../src/main/utils/mediaProcessing.mjs)。更新历史见 [CHANGELOG](../CHANGELOG.md)。
 
-## 真实生产链路
+## 生产处理链路
 
-`fileOperation.saveFileToLocal` 现在调用导出的 `processOutgoingMedia`；它与 `createMediaProcessors` 被下面的自动化直接使用，验证的不是另写的一套转码命令替身。
+1. 调用开始时固定账号、token、缓存根目录和服务器 origin，一次读取该账号消息的原始文件名与时间。
+2. 在固定账号目录内使用 UUID 临时文件处理。HEVC 通过 libx264 转为 H.264/yuv420p；MP4/MOV 使用 faststart。包含视频流时生成 PNG 封面，纯音频不生成封面。
+3. 处理完整成功后才将临时文件替换到正式缓存，上传保留用户原文件名并使用处理后的实际字节和 MIME。
+4. 每个异步阶段检查账号/token 是否仍一致；变更后停止后续处理和上传。失败清理本次临时文件，保留原有完整缓存。
 
-1. 固定开始时账号、token、缓存目录、服务器origin，一次读取该账号消息的原始文件名和时间。
-2. 在该账号缓存目录中使用UUID临时文件处理。HEVC用libx264、yuv420p转码，MP4/MOV补faststart；有视频流时生成PNG封面，只有音频流时跳过封面。
-3. 全部处理成功后才将完整临时文件替换到目标缓存，上传使用原文件名及处理后的真实字节。失败清理临时文件，转码失败不会删掉原有完整缓存。
-4. 各异步阶段检查账号/token是否仍一致；变更后停止后续处理/上传。不会在第二次查询路径时读取新账号的缓存目录。
+## 固定生成样本
 
-## 已复现的旧问题
+验证使用私有生成的 64×48、10 fps、1 秒 HEVC MP4，转码与过滤均限制单线程。没有使用摄像头、真实用户媒体或硬件编码。
 
-使用实际旧 `fileOperation.js` 在内存中转换为可加载模块，只替换账号、数据库和上传边界：第一条账号A消息查询尚未返回时切换到B。旧函数随后第二次读账号数据，确实将A的测试文件复制到B的 `202610/99.txt`。
+| 项目       | 实测结果                                                                              |
+| ---------- | ------------------------------------------------------------------------------------- |
+| 输入       | HEVC / yuv420p / 64×48 / 1.000 秒 / 4589 字节                                         |
+| 输出       | H.264 / yuv420p / 64×48 / 1.000 秒 / 3169 字节                                        |
+| 封面       | PNG / RGB24 / 170×128 / 23569 字节                                                    |
+| 上传原名   | `original-user-video.mp4`                                                             |
+| 最终元数据 | `messageId=42, fileName=original-user-video.mp4, fileSize=3169, fileType=1, status=1` |
+| 上传 MIME  | 主文件 `video/mp4`，封面 `image/png`                                                  |
+| 字节核对   | 实际 multipart HTTP 接收的主文件和封面与缓存逐字节一致，源文件保持不变                |
+| 播放       | ffmpeg 完整解码成功；真实 Chromium 返回 64×48、`duration=1`、`readyState=4`           |
 
-同一场景对新实现再次执行：只读取一次消息，抛出账号变更错误，A/B缓存均没有写入。另有回归覆盖探测编码期间切号、转码失败不覆盖原缓存、音频不生成封面。
+| 文件 | SHA-256                                                            |
+| ---- | ------------------------------------------------------------------ |
+| 输入 | `3ed4b2140d15ea56fea895dbdaf3d51040fd30a4d4d315e02a7d4d38dc8836d4` |
+| 输出 | `d8d3536597d2fb5a0a011573902d7af9c0266c22b00b880968076a70eb3f78c9` |
+| 封面 | `55f000efd927c8b8da3381dc2ec31851f261a77fd0638f0243d8856cda2a21d8` |
 
-前后证据位于 `D:/environment/WeTalkParityQA/20261004/hevc-verification/old-account-reproduction.json` 与 `fixed-account-verification.json`。均为生成的测试数据，不涉及用户资料。
+本地证据目录为 `D:/environment/WeTalkParityQA/20261004/hevc-verification/`，保存 `pipeline-result.json`、`source-hevc.mp4`、`output-h264.mp4` 和 `cover.png`。该接收器核对上传体及最终元数据；Spring/MySQL 持久化与真实跨端分发由[多端运行验收](multi-device-message-sync.md)独立证明。
 
-## 转码和上传结果
+## 账号边界证据
 
-| 项目 | 实测结果 |
-|---|---|
-| 输入 | HEVC / yuv420p / 64×48 / 1.000秒 / 4589字节 |
-| 输出 | H.264 / yuv420p / 64×48 / 1.000秒 / 3169字节 |
-| 封面 | PNG / RGB24 / 170×128 / 23569字节 |
-| 上传原名 | `original-user-video.mp4`，没有变成缓存编号名 |
-| HTTP中最终文件metadata | `messageId=42, fileName=original-user-video.mp4, fileSize=3169, fileType=1, status=1` |
-| 上传MIME | `video/mp4`，封面为 `image/png` |
-| 上传字节 | 真HTTP multipart收到的主文件/封面与实际缓存逐字节一致 |
-| 原文件 | SHA-256未变化 |
-| 解码 | ffmpeg完整解码成功；真实Chromium读到64×48、duration=1、readyState=4 |
+旧实现的对照复现使用实际 `fileOperation.js`，只替换账号、数据库和上传边界：账号 A 的第一条消息查询等待时切换为 B，旧函数随后重新读取账号，将 A 的生成测试文件复制到 B 的 `202610/99.txt`。
 
-- 输入SHA-256：`3ed4b2140d15ea56fea895dbdaf3d51040fd30a4d4d315e02a7d4d38dc8836d4`
-- 输出SHA-256：`d8d3536597d2fb5a0a011573902d7af9c0266c22b00b880968076a70eb3f78c9`
-- 封面SHA-256：`55f000efd927c8b8da3381dc2ec31851f261a77fd0638f0243d8856cda2a21d8`
+当前实现对同一场景只读取一次消息并报告账号变更，A/B 缓存均无写入。另有回归覆盖探测编码期间切号、转码失败保留缓存、纯音频跳过封面。对照证据分别为同目录 `old-account-reproduction.json` 和 `fixed-account-verification.json`，均使用生成数据。
 
-真实函数+ffmpeg+本地multipart HTTP+Chromium链路的结果在同目录 `pipeline-result.json`，并保留 `source-hevc.mp4`、`output-h264.mp4`、`cover.png`。该HTTP验收接收器验证上传体和最终metadata，未把它冒充成Spring/MySQL持久化或多端WebSocket验收；服务端type6与同账号另一端metadata合并由对应集成验收覆盖。
+## 重跑方法
 
-## 回归和重跑
+```cmd
+node --test tests/outgoingMedia.test.mjs tests/avatarCover.test.mjs tests/localMediaServer.test.mjs tests/cachedUploadFile.test.mjs tests/fileUpload.test.mjs
+```
 
-`node --test tests/outgoingMedia.test.mjs tests/avatarCover.test.mjs tests/localMediaServer.test.mjs tests/cachedUploadFile.test.mjs tests/fileUpload.test.mjs` 共22项通过、无跳过；实际Chromium分支在设置 `WETALK_PLAYWRIGHT_PACKAGE` 与 `PLAYWRIGHT_BROWSERS_PATH` 后执行。`WETALK_HEVC_EVIDENCE_DIR` 可选指定生成证据的目录。`npm run build` 验证main/preload/renderer。
+真实 Chromium 分支需要 Playwright 包和已安装浏览器。下列是本机既有验证环境的路径，其他机器需替换成各自路径：
 
-最终桌面全套回归在 `de22cd0` 达到106/106通过、失败0、跳过0，显式启用真实HEVC及Chromium分支。随后基于该源码快照重建NSIS最终测试包，SHA-256为 `770f0313699acbdddb6969922cbd46a058e950903c72893bdc0b18c0b8937faa`，稳定副本为 `D:/environment/WeTalkParityQA/20261004/nsis-verification/WeTalkAppSetup.1.0.0-default-local-de22cd0.exe`。包内实际media处理调用、`yuv420p`、最终metadata合并及57个编译文件与本轮构建输出均通过静态验证。
+```cmd
+set WETALK_PLAYWRIGHT_PACKAGE=D:/environment/WeTalkBrowserQA/node_modules/playwright
+set PLAYWRIGHT_BROWSERS_PATH=D:/environment/WeTalkBrowserQA/browsers
+node --test tests/outgoingMedia.test.mjs tests/avatarCover.test.mjs tests/localMediaServer.test.mjs tests/cachedUploadFile.test.mjs tests/fileUpload.test.mjs
+```
 
-首轮NSIS安装器 `f48147f0…` 对应源码 `3ff96f9`，第二轮 `e04d0d72…` 对应包含HEVC修改及最终metadata合并的 `a5f96bd`；三个源码快照的稳定副本与验证记录均保留，详见 `windows-package-verification.md`。安装器与打包应用主程序均未运行。
+可选设置 `WETALK_HEVC_EVIDENCE_DIR` 保存生成证据。该组已完成的验证结果为 **22 通过、0 跳过**，实际使用生产函数、已安装 ffmpeg、本地 multipart HTTP 和 Chromium。最终桌面全套测试在源码 `de22cd0` 上达到 **106 通过、0 失败、0 跳过**，命令与构建证据见[安装包核验](windows-package-verification.md)。
+
+这些结果证明指定生成样本及所列异常路径，不承诺任意容器/编码均可播放。最终 NSIS 内的生产调用、`yuv420p` 和编译文件做过静态检查；安装器及打包应用主程序未运行。
