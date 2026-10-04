@@ -28,6 +28,7 @@
     "test:settings": "node --test tests/systemSettingValidation.test.mjs",
     "test:upload-validation": "node --test tests/uploadValidation.test.mjs",
     "test:group-members": "node --test tests/groupMembers.test.mjs",
+    "test:contact-applications": "node --test tests/contactApplicationPaging.test.mjs",
     "postinstall": "electron-builder install-app-deps",
     "build:win": "npm run build && electron-builder --win --config",
     "build:mac": "npm run build && electron-builder --mac --config",

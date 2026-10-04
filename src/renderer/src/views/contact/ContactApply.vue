@@ -37,7 +37,9 @@
         </div>
       </div>
     </div>
-    <div v-if="applyList.length === 0" class="no-data">暂无好友请求</div>
+    <p v-if="paging.error" role="alert">{{ paging.error }}</p>
+    <el-button v-if="paging.pageNo < paging.pageTotal" :loading="paging.loading" @click="loadApply">加载更多申请</el-button>
+    <div v-if="!paging.loading && !paging.error && applyList.length === 0" class="no-data">暂无好友请求</div>
   </ContentPanel>
 </template>
 
@@ -45,33 +47,18 @@
 import Confirm from '@/utils/Confirm'
 import Request from '@/utils/Request'
 import Api from '@/utils/Api'
-import { onMounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, reactive, watch } from 'vue'
 import { useContactStateStore } from '@/stores/ContactStateStore'
 import { useMessageCountStore } from '@/stores/MessageCountStore'
+import { createContactApplicationPager } from '@/utils/contactApplicationPaging.mjs'
 
 const contactStateStore = useContactStateStore()
 const messageCountStore = useMessageCountStore()
 //获取申请
-let pageNo = 0
-let pageTotal = 10
-const applyList = ref([])
-const loadApply = async () => {
-  pageNo++
-  if (pageNo > pageTotal) return
-  let result = await Request({
-    url: Api.loadApply,
-    params: {}
-  })
-  if (!result) {
-    return
-  }
-  pageTotal = result.data.pageTotal
-  if (result.data.list.pageNo === 1) {
-    applyList.value = []
-  }
-  applyList.value = applyList.value.concat(result.data.list)
-  pageNo = result.data.pageNo
-}
+const paging = reactive({ items: [], pageNo: 0, pageTotal: 1, loading: false, error: '' })
+const pager = createContactApplicationPager({ state: paging, request: Request })
+const applyList = computed(() => paging.items)
+const loadApply = () => pager.load()
 
 //处理申请
 const dealWithApply = (applyId, contactType, status) => {
@@ -89,9 +76,7 @@ const dealWithApply = (applyId, contactType, status) => {
       if (!result) {
         return
       }
-      pageNo = 0
-      applyList.value = []
-      await loadApply()
+      await pager.reload()
       if (contactType === 0 && status === 1) {
         contactStateStore.setContactReload('USER')
       } else if (contactType === 1 && status === 1) {
@@ -105,14 +90,12 @@ const dealWithApply = (applyId, contactType, status) => {
 watch(
   () => messageCountStore.messageCount.contactApplyCount,
   (newVal, oldVal) => {
-    if (newVal) {
-      loadApply()
-      pageNo = 1
-    }
+    if (newVal > (oldVal || 0)) void pager.reload()
   },
-  { immediate: true, deep: true }
+  { deep: true }
 )
 onMounted(() => loadApply())
+onUnmounted(() => pager.dispose())
 </script>
 
 <style scoped lang="less">
