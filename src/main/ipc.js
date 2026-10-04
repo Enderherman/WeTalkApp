@@ -191,9 +191,12 @@ const onAddChatMessage = () => {
  * 创建缩略图
  */
 const onCreateCover = () => {
-  ipcMain.on('createCover', async (e, localFilePath) => {
-    const stream = await createCover(localFilePath)
-    e.sender.send('createCoverCallback', stream)
+  ipcMain.handle('createCover', async (e, localFilePath) => {
+    const userId = store.getUserId()
+    if (!userId) throw new Error('请先登录')
+    const result = await createCover(localFilePath)
+    if (userId !== store.getUserId()) throw new Error('登录账号已变化')
+    return result
   })
 }
 

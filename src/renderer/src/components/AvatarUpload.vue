@@ -14,7 +14,8 @@
         <el-upload
           name="file"
           :show-file-list="false"
-          accept=".png,.PNG,.jpg,.JPG,.jpeg,.JPEG,.gif,.GIF ,. bmp, .BMP"
+          accept=".png,.jpg,.jpeg,.gif,.bmp,.webp"
+          :disabled="state.loading"
           :multiple="false"
           :http-request="uploadImage"
         >
@@ -26,21 +27,23 @@
       <el-upload
         name="file"
         :show-file-list="false"
-        accept=".png,.PNG,.jpg,.JPG,.jpeg,.JPEG,.gif,.GIF ,. bmp, .BMP"
+        accept=".png,.jpg,.jpeg,.gif,.bmp,.webp"
+        :disabled="state.loading"
         :multiple="false"
         :http-request="uploadImage"
       >
-        <el-button type="primary" size="small">选择</el-button>
+        <el-button type="primary" size="small" :loading="state.loading">选择</el-button>
       </el-upload>
     </div>
+    <p v-if="state.error" role="alert">{{ state.error }}</p>
   </div>
 </template>
 
 <script setup>
 import ShowLocalImage from '@/components/ShowLocalImage.vue'
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, onUnmounted, reactive, ref } from 'vue'
+import { createAvatarSelection } from '@/utils/uploadValidation.mjs'
 
-//TODO preview预览
 const preview = computed(() => {
   return props.modelValue instanceof File
 })
@@ -56,30 +59,23 @@ const props = defineProps({
  * 头像上传
  */
 const localFile = ref(null)
-const emit = defineEmits(['coverFile'])
-const uploadImage = async (file) => {
-  file = file.file
-  window.ipcRenderer.send('createCover', file.path)
-}
-
-onMounted(() => {
-  window.ipcRenderer.on('createCoverCallback', (event, { avatarStream, coverStream }) => {
-    const coverBlob = new Blob([coverStream], { type: 'image/jpeg' })
-    const coverFile = new File([coverBlob], 'cover.jpg', { type: 'image/jpeg' })
-    let img = new FileReader()
-    img.readAsDataURL(coverFile)
-    img.onload = (target) => {
-      localFile.value = target.target.result
-    }
-
-    const avatarBlob = new Blob([avatarStream], { type: 'image/jpeg' })
-    const avatarFile = new File([avatarBlob], 'avatar.jpg', { type: 'image/jpeg' })
+const emit = defineEmits(['coverFile', 'update:modelValue'])
+const state = reactive({ loading: false, error: '' })
+const selection = createAvatarSelection({
+  state,
+  createCover: (path) => window.ipcRenderer.invoke('createCover', path),
+  onResult: ({ avatarFile, coverFile }) => {
+    if (localFile.value) URL.revokeObjectURL(localFile.value)
+    localFile.value = URL.createObjectURL(avatarFile)
+    emit('update:modelValue', avatarFile)
     emit('coverFile', { avatarFile, coverFile })
-  })
+  }
 })
+const uploadImage = (request) => selection.select(request.file)
 
 onUnmounted(() => {
-  window.ipcRenderer.removeAllListeners('createCoverCallback')
+  selection.dispose()
+  if (localFile.value) URL.revokeObjectURL(localFile.value)
 })
 </script>
 

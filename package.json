@@ -26,6 +26,7 @@
     "test:history-search": "node --test tests/historySearch.test.mjs",
     "test:session": "node --test tests/sessionLifecycle.test.mjs",
     "test:settings": "node --test tests/systemSettingValidation.test.mjs",
+    "test:upload-validation": "node --test tests/uploadValidation.test.mjs",
     "postinstall": "electron-builder install-app-deps",
     "build:win": "npm run build && electron-builder --win --config",
     "build:mac": "npm run build && electron-builder --mac --config",

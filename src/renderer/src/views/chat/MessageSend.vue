@@ -87,6 +87,7 @@ import { getFileType } from '@/utils/Constants'
 import { useUserInfoStore } from '@/stores/UserInfoStore'
 import { useSysSettingStore } from '@/stores/SystemSettingStore'
 import SearchAdd from '@/views/contact/SearchAdd.vue'
+import { validateChatUpload } from '@/utils/uploadValidation.mjs'
 
 const userInfoStore = useUserInfoStore()
 const sysSettingStore = useSysSettingStore()
@@ -261,12 +262,11 @@ const addContact = (contactId, code) => {
  * 校验文件大小
  */
 const checkFileSize = (fileType, fileSize, fileName) => {
-  const SIZE_MB = 1024 * 1024
-  const settings = sysSettingStore.getSetting()
-  const fileSizeLimit = settings[fileType === 0 ? 'maxImageSize' : fileType === 1 ? 'maxVideoSize' : 'maxFileSize']
-  if (fileSize > fileSizeLimit * SIZE_MB) {
+  if (fileType === undefined) return true
+  const error = validateChatUpload({ name: fileName, size: fileSize }, fileType, sysSettingStore.getSetting())
+  if (error) {
     Confirm({
-      message: `文件 ${fileName} 超出 ${fileSizeLimit} MB限制`,
+      message: error,
       showCancelBtn: false
     })
     return false
