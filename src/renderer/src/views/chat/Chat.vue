@@ -47,6 +47,11 @@
       <div v-show="Object.keys(currentChatSession).length > 0" class="chat-panel">
         <!--信息框-->
         <div id="message-panel" class="message-panel">
+          <div class="history-controls">
+            <button v-if="historyState.hasMore" type="button" :disabled="historyState.loading" @click="loadChatMessage">{{ historyState.loading ? '正在加载历史…' : '加载更早消息' }}</button>
+            <span v-else>已到最早消息</span>
+            <p v-if="historyState.error" role="alert">{{ historyState.error }}</p>
+          </div>
           <div
             v-for="(data, index) in messageList"
             :key="'message' + data.messageId"
@@ -120,7 +125,7 @@ import ChatMessageTime from '@/views/chat/ChatMessageTime.vue'
 import ChatMessage from '@/views/chat/ChatMessage.vue'
 import ChatSession from '@/views/chat/ChatSession.vue'
 import MessageSend from '@/views/chat/MessageSend.vue'
-import { nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import { nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import ContextMenu from '@imengyu/vue3-context-menu'
 import '@imengyu/vue3-context-menu/lib/vue3-context-menu.css'
 import Confirm from '@/utils/Confirm'
@@ -133,8 +138,13 @@ import { useRoute } from 'vue-router'
 import SearchResult from '@/views/chat/SearchResult.vue'
 import { messageText, highlightText } from '@/utils/messageText.mjs'
 import { applyContactRemark, contactDisplayName } from '@/utils/contactRemark.mjs'
+import Request from '@/utils/Request'
+import Api from '@/utils/Api'
+import { createHistoryPager, mergeHistoryMessages } from '@/utils/historyPaging.mjs'
+import { useUserInfoStore } from '@/stores/UserInfoStore'
 
 const route = useRoute()
+const userInfoStore = useUserInfoStore()
 const messageCountStore = useMessageCountStore()
 
 const chatSessionList = ref([])
@@ -175,6 +185,24 @@ let distanceToBottom = 0
 const currentChatSession = ref({})
 //消息列表
 const messageList = ref([])
+const historyState = reactive({ contactId: null, loading: false, hasMore: true, error: '', loaded: false, cursor: null })
+const historyPager = createHistoryPager({
+  state: historyState,
+  fetchPage: async (contactId, beforeMessageId, pageSize) => {
+    const result = await Request({ url: Api.loadHistory, params: { contactId, beforeMessageId: beforeMessageId ?? '', pageSize }, showLoading: false, showError: false })
+    return result?.data
+  },
+  onPage: async (messages, { contactId, append, isCurrent }) => {
+    const firstId = messageList.value[0]?.messageId
+    const sessionId = currentChatSession.value.sessionId
+    const cached = await window.ipcRenderer.invoke('cacheChatHistory', { userId: userInfoStore.getInfo().userId, messages })
+    if (!cached || !isCurrent() || currentChatSession.value.contactId !== contactId || currentChatSession.value.sessionId !== sessionId) return
+    messageList.value = mergeHistoryMessages(messageList.value, messages)
+    if (!append) scrollToBottom()
+    else if (firstId) nextTick(() => document.getElementById('message' + firstId)?.scrollIntoView())
+  },
+  onFailure: () => loadLocalChatMessage()
+})
 //消息分页信息
 const messagePageInfo = {
   totalPage: 0,
@@ -209,6 +237,7 @@ const chatSessionClickHandler = (item) => {
   messagePageInfo.totalPage = 1
   messagePageInfo.maxMessageId = null
   messagePageInfo.noData = false
+  historyPager.reset(item.contactId)
 
   // console.log('点击聊天会话', item)
   loadChatMessage()
@@ -228,7 +257,9 @@ const setSessionSelect = ({ contactId, sessionId }) => {
 /**
  * 分页查询消息记录
  */
-const loadChatMessage = () => {
+const loadChatMessage = () => historyPager.load()
+
+const loadLocalChatMessage = () => {
   if (messagePageInfo.noData) {
     return
   }
@@ -397,7 +428,8 @@ const onLoadChatSession = () => {
  * 接受记录信息
  */
 const onLoadChatMessage = () => {
-  window.ipcRenderer.on('loadChatMessageCallback', (event, { dataList, pageTotal, pageNo }) => {
+  window.ipcRenderer.on('loadChatMessageCallback', (event, { dataList, pageTotal, pageNo, sessionId }) => {
+    if (sessionId !== currentChatSession.value.sessionId) return
     if (pageNo === pageTotal) {
       messagePageInfo.noData = true
     }
@@ -405,7 +437,7 @@ const onLoadChatMessage = () => {
       return a.messageId - b.messageId
     })
     const lastMessage = messageList.value[0]
-    messageList.value = dataList.concat(messageList.value)
+    messageList.value = mergeHistoryMessages(messageList.value, dataList)
     messagePageInfo.pageNo = pageNo
     messagePageInfo.pageTotal = pageTotal
     if (pageNo === 1) {
@@ -415,7 +447,7 @@ const onLoadChatMessage = () => {
       scrollToBottom()
     } else {
       nextTick(() => {
-        document.querySelector('#message' + lastMessage.messageId).scrollIntoView()
+        if (lastMessage) document.querySelector('#message' + lastMessage.messageId)?.scrollIntoView()
       })
     }
     //更新完信息console.log(messageList.value)
@@ -529,6 +561,7 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  historyPager.dispose()
   window.ipcRenderer.removeAllListeners('receiveMessage')
   window.ipcRenderer.removeAllListeners('loadChatSessionCallback')
   window.ipcRenderer.removeAllListeners('loadChatMessageCallback')

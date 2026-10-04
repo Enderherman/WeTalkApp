@@ -16,7 +16,7 @@ import {
   updateChatSessionByChatMessage,
   updateChatSessionStatus
 } from './database/ChatSessionUserModel'
-import { saveMessage, selectChatMessage, updateMessage } from './database/ChatMessageModel'
+import { saveMessage, saveMessageBatch, selectChatMessage, updateMessage } from './database/ChatMessageModel'
 import {
   changeLocalFolder,
   closeLocalServer,
@@ -113,9 +113,14 @@ const onTopChatSession = () => {
  * 获取聊天
  */
 const onLoadChatMessage = () => {
+  ipcMain.handle('cacheChatHistory', async (e, { userId, messages }) => {
+    if (userId !== store.getUserId() || !Array.isArray(messages)) return false
+    await saveMessageBatch(messages)
+    return true
+  })
   ipcMain.on('loadChatMessage', async (e, data) => {
     const result = await selectChatMessage(data)
-    e.sender.send('loadChatMessageCallback', result)
+    e.sender.send('loadChatMessageCallback', { ...result, sessionId: data.sessionId })
   })
 }
 

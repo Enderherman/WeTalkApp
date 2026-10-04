@@ -40,6 +40,9 @@ const api = {
   updatePassword: '/account/updatePassword',
   logout: '/account/logout',
   sendMessage: '/chat/sendMessage', //发送消息
+  loadHistory: '/chat/loadHistory',
+  markRead: '/chat/markRead',
+  cancelAiMessage: '/chat/cancelAiMessage',
   uploadFile: '/chat/uploadFile', //上传文件地址
   loadAdminAccount: '/admin/loadUser', //后台获取用户列表
   updateUserStatus: '/admin/updateUserStatus', //后台更新用户状态
