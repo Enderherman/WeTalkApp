@@ -16,6 +16,7 @@
     "test:realtime": "node --test tests/realtimeClient.test.mjs tests/desktopMessageSync.test.mjs",
     "test:file-upload": "node --test tests/fileUpload.test.mjs",
     "test:message-text": "node --test tests/messageText.test.mjs",
+    "test:update-download": "node --test tests/updateDownload.test.mjs",
     "postinstall": "electron-builder install-app-deps",
     "build:win": "npm run build && electron-builder --win --config",
     "build:mac": "npm run build && electron-builder --mac --config",

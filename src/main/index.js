@@ -38,6 +38,7 @@ import { ensureAppDirectories } from './utils/platformUtils'
 import { startDesktopApiServer } from './utils/desktopApiServer.mjs'
 import { setDesktopRendererOrigin } from './utils/desktopRendererOrigin'
 import { closeWs } from './wsClient'
+import { externalHttpUrl } from './utils/updateDownload.mjs'
 
 let desktopApiServer = null
 
@@ -82,7 +83,8 @@ function createWindow() {
   })
 
   mainWindow.webContents.setWindowOpenHandler((details) => {
-    shell.openExternal(details.url)
+    const url = externalHttpUrl(details.url)
+    if (url) shell.openExternal(url)
     return { action: 'deny' }
   })
 

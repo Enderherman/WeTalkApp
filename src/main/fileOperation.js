@@ -5,7 +5,6 @@ const fse = require('fs-extra')
 const NODE_ENV = process.env.NODE_ENV
 const path = require('path')
 const { app, shell } = require('electron')
-const { exec } = require('child_process')
 const FormData = require('form-data') //引入FormData模块（用于构建表单数据)
 const axios = require('axios') // 引入axios库
 import store from './store'
@@ -13,6 +12,7 @@ import { dialog } from 'electron'
 import { selectSettingInfo, updateSysSetting } from './database/UserSettingModel'
 import { getWindow } from './windowProxy'
 import { uploadFileRequest } from './utils/fileUpload.mjs'
+import { downloadUpdatePackage } from './utils/updateDownload.mjs'
 
 // 引入 ffmpeg 相关包
 const ffmpeg = require('fluent-ffmpeg')
@@ -177,21 +177,6 @@ const uploadFile = (messageId, savePath, coverPath, token) => {
   }
   const url = `${getDomainPath()}/api/chat/uploadFile`
   return uploadFileRequest(url, formData, token)
-}
-
-/**
- * 执行命令
- */
-const execCommand = (command) => {
-  return new Promise((resolve, reject) => {
-    exec(command, (error, stdout) => {
-      if (error) {
-        reject(error)
-      } else {
-        resolve(stdout)
-      }
-    })
-  })
 }
 
 /**
@@ -507,31 +492,13 @@ const changeLocalFolder = async () => {
 /**
  * 下载更新 安装更新
  */
-const downloadUpdate = async (id, fileName) => {
-  let url = `${store.getData('prodDomain')}/api/app/downloadUpdate`
-  const token = store.getUserData('token')
-  const params = new URLSearchParams()
-  params.set('id', String(id))
-  const config = {
-    responseType: 'stream',
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
-      token: token
-    },
-    onDownloadProgress(progress) {
-      const loaded = progress.loaded
-      getWindow('main').webContents.send('downloadUpdateCallback', loaded)
-    }
-  }
-  const response = await axios.post(url, params, config)
-  const localFile = await getLocalFilePath(null, false, fileName)
-  const stream = fs.createWriteStream(localFile)
-  response.data.pipe(stream)
-  stream.on('finish', async () => {
-    stream.close()
-    const command = `"${localFile}"`
-    execCommand(command)
+const downloadUpdate = async (id, fileName, expectedSize, onProgress) => {
+  const localFile = await downloadUpdatePackage({
+    url: `${getDomainPath()}/api/app/downloadUpdate`, id, fileName, expectedSize,
+    token: store.getUserData('token'), directory: path.join(app.getPath('temp'), 'wetalk-updates'), onProgress
   })
+  const error = await shell.openPath(localFile)
+  if (error) throw new Error(`无法启动安装程序：${error}`)
 }
 export {
   saveFileToLocal,

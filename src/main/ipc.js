@@ -33,6 +33,7 @@ import { join } from 'path'
 import { is } from '@electron-toolkit/utils'
 import { download } from 'node-gyp/lib/download'
 import { persistOutgoingFile } from './utils/fileUpload.mjs'
+import { externalHttpUrl } from './utils/updateDownload.mjs'
 
 const NODE_ENV = process.env.NODE_ENV
 
@@ -334,7 +335,8 @@ const onReloadChatSession = () => {
  */
 const onOpenUrl = () => {
   ipcMain.on('openUrl', async (e, { url }) => {
-    await shell.openExternal(url)
+    const safeUrl = externalHttpUrl(url)
+    if (safeUrl) await shell.openExternal(safeUrl)
   })
 }
 
@@ -342,8 +344,10 @@ const onOpenUrl = () => {
  * 开始下载
  */
 const onDownloadUpdate = () => {
-  ipcMain.on('downloadUpdate', async (e, { id, fileName }) => {
-    await downloadUpdate(id, fileName)
+  ipcMain.on('downloadUpdate', async (e, { id, fileName, size }) => {
+    const notify = (state) => { if (!e.sender.isDestroyed()) e.sender.send('downloadUpdateCallback', state) }
+    try { await downloadUpdate(id, fileName, size, notify) }
+    catch (error) { notify({ error: error.message || '更新下载失败，请重试' }) }
   })
 }
 

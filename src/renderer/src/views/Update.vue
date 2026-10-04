@@ -71,7 +71,7 @@ const checkUpdateAuto = async (auto) => {
     }
   })
   if (!result) {
-    Message.error('没写呢')
+    Message.error('检查更新失败，请稍后重试')
     return
   }
   if (result.data == null) {
@@ -106,9 +106,11 @@ const downloadPercent = ref({
 const startDownload = async () => {
   if (updateInfo.value.fileType === 0) {
     downloading.value = true
+    downloadPercent.value = { progress: 0, loaded: 0, total: updateInfo.value.size }
     window.ipcRenderer.send('downloadUpdate', {
       id: updateInfo.value.id,
-      fileName: updateInfo.value.fileName
+      fileName: updateInfo.value.fileName,
+      size: updateInfo.value.size
     })
   } else if (updateInfo.value.fileType === 1) {
     Message.success('已在浏览器中打开更新链接')
@@ -125,13 +127,17 @@ onMounted(() => {
   if (props.autoUpdate) {
     checkUpdateAuto(true)
   }
-  window.ipcRenderer.on('updateDownloadCallback', (loaded) => {
-    downloadPercent.value.loaded = loaded
-    downloadPercent.value.progress = Math.floor((loaded / updateInfo.value.size) * 100)
+  window.ipcRenderer.on('downloadUpdateCallback', (event, state) => {
+    if (state.error) {
+      downloading.value = false
+      Message.error(state.error)
+      return
+    }
+    downloadPercent.value = state
   })
 })
 onUnmounted(() => {
-  window.ipcRenderer.removeAllListeners('updateDownloadCallback')
+  window.ipcRenderer.removeAllListeners('downloadUpdateCallback')
 })
 defineExpose({
   checkUpdate
