@@ -72,6 +72,7 @@ import { useContactStateStore } from '@/stores/ContactStateStore'
 import { useMessageCountStore } from '@/stores/MessageCountStore'
 import Badge from '@/components/Badge.vue'
 import SearchResult from '@/views/chat/SearchResult.vue'
+import { highlightText } from '@/utils/messageText.mjs'
 
 const contactStateStore = useContactStateStore()
 const messageCountStore = useMessageCountStore()
@@ -219,7 +220,6 @@ const search = () => {
   }
   searchList.value = []
   allContactList.value = []
-  const regex = new RegExp('(' + searchKey.value + ')', 'gi')
 
   partList.value.forEach((item) => {
     if (item.contactData) {
@@ -229,9 +229,10 @@ const search = () => {
   console.log('allContactList: ', allContactList.value)
   allContactList.value.forEach((item) => {
     let contactName = item.groupId ? item.groupName : item.contactName
-    if (contactName.includes(searchKey.value)) {
+    if (String(contactName || '').toLocaleLowerCase().includes(searchKey.value.toLocaleLowerCase())) {
       let newData = Object.assign({}, item)
-      newData.searchContactName = contactName.replace(regex, "<span class='highlight'>$1</span>")
+      newData.searchContactName = contactName
+      newData.searchContactParts = highlightText(contactName, searchKey.value)
       newData.contactId = item.groupId ? item.groupId : item.contactId
       searchList.value.push(newData)
     }

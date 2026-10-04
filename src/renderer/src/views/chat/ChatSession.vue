@@ -8,7 +8,7 @@
         <div class="user-name">{{ data.contactName }}</div>
         <div class="message-time">{{ Utils.formatDate(data.lastReceiveTime) }}</div>
       </div>
-      <div class="last-message" v-html="data.lastMessage"></div>
+      <div class="last-message">{{ messageText(data.lastMessage) }}</div>
     </div>
     <div v-if="data.topType === 1" class="chat-top iconfont icon-top"></div>
   </div>
@@ -17,6 +17,7 @@
 <script setup>
 import AvatarBase from '@/components/AvatarBase.vue'
 import Utils from '../../utils/Utils'
+import { messageText } from '@/utils/messageText.mjs'
 
 const props = defineProps({
   data: {

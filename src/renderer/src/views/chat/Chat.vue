@@ -131,6 +131,7 @@ import ChatGroupDetail from '@/views/chat/ChatGroupDetail.vue'
 import { useMessageCountStore } from '@/stores/MessageCountStore'
 import { useRoute } from 'vue-router'
 import SearchResult from '@/views/chat/SearchResult.vue'
+import { messageText, highlightText } from '@/utils/messageText.mjs'
 
 const route = useRoute()
 const messageCountStore = useMessageCountStore()
@@ -628,18 +629,14 @@ const search = () => {
     return
   }
   searchList.value = []
-  const regex = new RegExp('(' + searchKey.value + ')', 'gi')
   chatSessionList.value.forEach((item) => {
-    if (item.contactName.includes(searchKey.value) || item.lastMessage.includes(searchKey.value)) {
+    const contactName = String(item.contactName || '')
+    const lastMessage = messageText(item.lastMessage)
+    const query = searchKey.value.toLocaleLowerCase()
+    if (contactName.toLocaleLowerCase().includes(query) || lastMessage.toLocaleLowerCase().includes(query)) {
       let newData = Object.assign({}, item)
-      newData.searchContactName = newData.contactName.replace(
-        regex,
-        "<span class='highlight'>$1</span>"
-      )
-      newData.searchLastMessage = newData.lastMessage.replace(
-        regex,
-        "<span class='highlight'>$1</span>"
-      )
+      newData.searchContactParts = highlightText(contactName, searchKey.value)
+      newData.searchLastParts = highlightText(lastMessage, searchKey.value)
       searchList.value.push(newData)
     }
   })

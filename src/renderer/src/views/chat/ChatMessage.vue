@@ -13,7 +13,7 @@
         </el-skeleton>
       </div>
       <template v-else>
-        <div v-if="data.messageType !== 5" class="content" v-html="data.messageContent"></div>
+        <div v-if="data.messageType !== 5" class="content">{{ messageText(data.messageContent) }}</div>
         <div class="content" v-else>
           <template v-if="data.fileType === 0">
             <ChatMessageImage :data="data" @click="showDetail"></ChatMessageImage>
@@ -49,7 +49,7 @@
         </el-skeleton>
       </div>
       <template v-else>
-        <div v-if="data.messageType !== 5" class="content" v-html="data.messageContent"></div>
+        <div v-if="data.messageType !== 5" class="content">{{ messageText(data.messageContent) }}</div>
         <div v-else class="content">
           <template v-if="data.fileType === 0">
             <ChatMessageImage :data="data" @click="showDetail"></ChatMessageImage>
@@ -71,6 +71,7 @@ import ChatMessageImage from '@/views/chat/ChatMessageImage.vue'
 import ChatMessageVideo from '@/views/chat/ChatMessageVideo.vue'
 import { useUserInfoStore } from '@/stores/UserInfoStore'
 import ChatMessageFile from '@/views/chat/ChatMessageFile.vue'
+import { messageText } from '@/utils/messageText.mjs'
 
 const userInfoStore = useUserInfoStore()
 const props = defineProps({
@@ -108,6 +109,8 @@ const showDetail = () => {
 }
 
 .content {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
   display: inline-block;
   padding: 8px;
   color: #474747;

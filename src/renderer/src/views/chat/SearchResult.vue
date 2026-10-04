@@ -2,8 +2,8 @@
   <div class="search-item">
     <Avatar :user-id="data.contactId" :showi-detail="false"></Avatar>
     <div class="contact-info">
-      <div class="contact-name" v-html="data.searchContactName"></div>
-      <div class="last-message" v-html="data.searchLastMessage"></div>
+      <div class="contact-name"><span v-for="(part, index) in data.searchContactParts" :key="index" :class="{ highlight: part.match }">{{ part.text }}</span></div>
+      <div class="last-message"><span v-for="(part, index) in data.searchLastParts" :key="index" :class="{ highlight: part.match }">{{ part.text }}</span></div>
     </div>
   </div>
 </template>
