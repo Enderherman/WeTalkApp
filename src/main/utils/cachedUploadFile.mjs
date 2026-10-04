@@ -7,5 +7,6 @@ export function appendCachedUploadFile(form, cachePath, originalName) {
   const filename = path.win32.basename(path.posix.basename(originalName))
   if (!filename || filename === '.' || filename === '..') throw new Error('上传文件名无效')
   // FormData otherwise checks the stream's cache path before options.filename for MIME.
-  form.append('file', createReadStream(cachePath), { filename, contentType: mime.lookup(filename) || 'application/octet-stream' })
+  const contentType = path.extname(filename).toLowerCase() === '.mjpeg' ? 'image/jpeg' : mime.lookup(filename) || 'application/octet-stream'
+  form.append('file', createReadStream(cachePath), { filename, contentType })
 }

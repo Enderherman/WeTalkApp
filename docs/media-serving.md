@@ -35,3 +35,5 @@
 真实本地 multipart HTTP 测试验证中文文本名、PNG和WAV原名/MIME/文件体均一致，并拒绝文件名中的头部控制字符。连同头像转换、媒体服务和上传状态共17项通过，桌面构建通过。真实后端/桌面刷新后名称与下载字节由集成验收再次检查。
 
 后续核对补充：后端缺失头像的业务码602也使用默认头像回退，普通附件602仍返回404；打包实际使用YAML配置，因此在 `electron-builder.yml` 显式声明 `assets → resources/assets`，确保 `process.resourcesPath/assets/default_avatar.png` 存在，不能只依赖package.json中的另一份配置。
+
+聊天 `.mjpeg` 作为 JPEG 图片别名上传时显式使用 `image/jpeg`，覆盖通用mime-types对该扩展名的 `video/x-motion-jpeg` 推断；保持原文件名。后端 `32de3e8` 同时兼容旧客户端 MIME，仍验证JPEG签名并执行图片配额。真实multipart回归包含该别名。

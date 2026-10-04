@@ -24,7 +24,7 @@ test('uploads original text, image and audio names with their MIME while reading
     assert(path.resolve(directory).startsWith(path.resolve(tmpdir()) + path.sep + 'wetalk-upload-name-test-'))
     await fs.rm(directory, { recursive: true, force: true })
   })
-  const files = [['用户原名.txt', 'text/plain'], ['holiday.png', 'image/png'], ['recording.wav', 'audio/wave']]
+  const files = [['用户原名.txt', 'text/plain'], ['holiday.png', 'image/png'], ['recording.wav', 'audio/wave'], ['camera.mjpeg', 'image/jpeg']]
   for (const [filename] of files) {
     const cachePath = path.join(directory, '100.bin')
     await fs.writeFile(cachePath, `body:${filename}`)
