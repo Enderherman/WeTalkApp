@@ -73,10 +73,10 @@ const logout = () => {
     message: '确定要退出登录吗',
     showCancelBtn: true,
     okfun: async () => {
-      window.ipcRenderer.send('reLogin')
       await Request({
         url: Api.logout
       })
+      window.ipcRenderer.send('reLogin')
     }
   })
 }

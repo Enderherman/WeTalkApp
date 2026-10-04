@@ -18,14 +18,14 @@ const selectChatSessionUser = () => {
   return queryAll(sql, [store.getUserId()])
 }
 
-const addChatSessionUser = (sessionInfo) => {
-  sessionInfo.userId = store.getUserId()
+const addChatSessionUser = (sessionInfo, userId = store.getUserId()) => {
+  sessionInfo.userId = userId
   return insertOrIgnore('chat_session_user', sessionInfo)
 }
 
-const updateChatSessionUser = (sessionInfo) => {
+const updateChatSessionUser = (sessionInfo, userId = store.getUserId()) => {
   const paramData = {
-    userId: store.getUserId(),
+    userId,
     contactId: sessionInfo.contactId
   }
   const updateInfo = Object.assign({}, sessionInfo)
@@ -42,18 +42,19 @@ const updateChatSessionUser = (sessionInfo) => {
  * @returns {Promise<void>} 处理完成的Promise
  */
 const saveOrUpdateChatSessionUserBatch4Init = async (chatSessionList) => {
+  const userId = store.getUserId()
   try {
     // 准备所有会话处理操作
     const sessionPromises = chatSessionList.map(async (sessionInfo) => {
       // 设置会话状态为有效
       sessionInfo.status = 1
       // 检查会话是否已存在
-      const existingSession = await selectUserSessionByContactId(sessionInfo.contactId)
+      const existingSession = await selectUserSessionByContactId(sessionInfo.contactId, userId)
       // 根据是否存在决定更新或添加
       if (existingSession) {
-        return updateChatSessionUser(sessionInfo)
+        return updateChatSessionUser(sessionInfo, userId)
       } else {
-        return addChatSessionUser(sessionInfo)
+        return addChatSessionUser(sessionInfo, userId)
       }
     })
     // 并行处理所有会话
@@ -90,12 +91,12 @@ const clearNoReadCount = (contactId) => {
 /**
  * 根据id查询会话
  */
-const selectUserSessionByContactId = (contactId) => {
+const selectUserSessionByContactId = (contactId, userId = store.getUserId()) => {
   let sql = `SELECT *
              FROM chat_session_user
              WHERE user_id = ?
                and contact_id = ?`
-  return queryOne(sql, [store.getUserId(), contactId])
+  return queryOne(sql, [userId, contactId])
 }
 
 /**
@@ -129,7 +130,7 @@ const topChatSessionUser = (contactId, topType) => {
 const updateChatSessionByChatMessage = async (
   currentSessionId,
   { sessionId, contactName, lastMessage, lastReceiveTime, contactId, memberCount },
-  { incrementUnread = true } = {}
+  { incrementUnread = true, userId = store.getUserId() } = {}
 ) => {
   const params = [lastMessage, lastReceiveTime]
   let sql = `UPDATE chat_session_user
@@ -149,7 +150,7 @@ const updateChatSessionByChatMessage = async (
     sql = sql + `,no_read_count = no_read_count + 1`
   }
   sql = sql + ` WHERE user_id = ? and contact_id = ?`
-  params.push(store.getUserId())
+  params.push(userId)
   params.push(contactId)
   return run(sql, params)
 }
@@ -176,17 +177,18 @@ const readAll = (contactId) => {
  * @returns {Promise<void>} - 返回一个Promise，操作完成后解析
  */
 const saveOrUpdateChatSessionByMessage = async (currentSessionId, sessionInfo, options = {}) => {
+  const userId = store.getUserId()
   try {
     // 查询用户是否已有与该联系人的会话
-    const existingSession = await selectUserSessionByContactId(sessionInfo.contactId)
+    const existingSession = await selectUserSessionByContactId(sessionInfo.contactId, userId)
 
     if (existingSession) {
       // 会话已存在，更新现有会话
-      await updateChatSessionByChatMessage(currentSessionId, sessionInfo, options)
+      await updateChatSessionByChatMessage(currentSessionId, sessionInfo, { ...options, userId })
     } else {
       // 会话不存在，创建新会话并设置未读计数为1
       sessionInfo.noReadCount = options.incrementUnread !== false && sessionInfo.sessionId !== currentSessionId ? 1 : 0
-      await addChatSessionUser(sessionInfo)
+      await addChatSessionUser(sessionInfo, userId)
     }
   } catch (error) {
     console.error('保存或更新聊天会话失败:', error)

@@ -41,6 +41,7 @@ import { closeWs } from './wsClient'
 import { externalHttpUrl } from './utils/updateDownload.mjs'
 
 let desktopApiServer = null
+const hasDevRenderer = is.dev && Boolean(process.env['ELECTRON_RENDERER_URL'])
 
 // 禁用 DNS over HTTPS
 app.commandLine.appendSwitch('disable-features', 'DnsOverHttps')
@@ -90,7 +91,7 @@ function createWindow() {
 
   // HMR for renderer base on electron-vite cli.
   // Load the remote URL for development or the local html file for production.
-  if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
+  if (hasDevRenderer) {
     mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL'])
   } else if (desktopApiServer) {
     mainWindow.loadURL(`${desktopApiServer.origin}/index.html`)
@@ -110,6 +111,7 @@ function createWindow() {
     }
   ]
   const menu = Menu.buildFromTemplate(contextMenu)
+  const defaultTrayMenu = [...contextMenu]
   tray.setToolTip('微语')
   tray.setContextMenu(menu)
   tray.on('click', () => {
@@ -131,6 +133,7 @@ function createWindow() {
 
   //登录成功
   onLoginSuccess((config) => {
+    contextMenu.splice(0, contextMenu.length, ...defaultTrayMenu)
     mainWindow.setResizable(true)
     mainWindow.setSize(850, 800)
     //居中显示
@@ -242,12 +245,15 @@ function createWindow() {
   onClearContactApplyCount()
 
   onLoginOut(() => {
+    contextMenu.splice(0, contextMenu.length, ...defaultTrayMenu)
+    tray.setContextMenu(Menu.buildFromTemplate(contextMenu))
     mainWindow.setResizable(true)
     mainWindow.setMinimumSize(login_width, login_height)
     mainWindow.setSize(login_width, login_height)
     mainWindow.center()
     mainWindow.setResizable(false)
-    mainWindow.setSkipTaskbar(true)
+    mainWindow.setSkipTaskbar(false)
+    mainWindow.show()
   })
 
   onOpenLocalFolder()
@@ -282,7 +288,7 @@ app.whenReady().then(async () => {
   // 确保应用目录结构
   ensureAppDirectories()
 
-  if (!is.dev) {
+  if (!hasDevRenderer) {
     try {
       desktopApiServer = await startDesktopApiServer({
         apiOrigin: import.meta.env.RENDERER_VITE_WETALK_SERVER_ORIGIN || 'http://127.0.0.1:5050',

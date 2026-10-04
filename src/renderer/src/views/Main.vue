@@ -63,6 +63,7 @@ import { useSysSettingStore } from '@/stores/SystemSettingStore'
 import { useMessageCountStore } from '@/stores/MessageCountStore'
 import { useAvatarInfoStore } from '@/stores/AvatarUploadStore'
 import Update from '@/views/Update.vue'
+import { clearRendererSession } from '@/utils/routeAccess.mjs'
 
 const messageCountStore = useMessageCountStore()
 const userInfoStore = useUserInfoStore()
@@ -139,7 +140,8 @@ onMounted(() => {
 
   //退出登录跳转到登录界面
   window.ipcRenderer.on('reLogin', () => {
-    router.push('/login')
+    clearRendererSession(localStorage, [userInfoStore, globalInfoStore, sysSettingStore, messageCountStore, avatarInfoStore])
+    router.replace('/login')
   })
 })
 

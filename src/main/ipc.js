@@ -37,6 +37,7 @@ import { persistOutgoingFile } from './utils/fileUpload.mjs'
 import { externalHttpUrl } from './utils/updateDownload.mjs'
 import { databaseReady } from './database/ADB'
 import { loadTextOutbox, saveTextDraft, removeTextDraft } from './database/TextOutboxModel'
+import { clearDesktopSession } from './utils/sessionLifecycle.mjs'
 
 const NODE_ENV = process.env.NODE_ENV
 
@@ -52,6 +53,7 @@ const onLoginSuccess = (callback) => {
     //存储用户id
     store.initUserId(config.userId)
     store.setUserData('token', config.token)
+    store.setUserData('admin', config.admin === true)
     await addUserSetting(config.userId, config.email)
     callback(config)
     initWs(config, e.sender)
@@ -87,6 +89,10 @@ const onGetLocalStore = () => {
  * 查询chatSession
  */
 const onLoadChatSession = () => {
+  ipcMain.on('retryConnection', () => {
+    const userId = store.getUserId(), token = store.getUserData('token')
+    if (userId && token) initWs({ userId, token }, getWindow('main').webContents)
+  })
   ipcMain.on('loadChatSession', async (e) => {
     const data = await selectChatSessionUser()
     e.sender.send('loadChatSessionCallback', data)
@@ -201,6 +207,8 @@ const onOpenNewWindow = () => {
 }
 
 const openWindow = ({ windowId, title = 'WeTalk', path, width = 960, height = 720, data }) => {
+  if (!store.getUserId() || !['/admin', '/showMedia'].includes(path)) return
+  if (path === '/admin' && store.getUserData('admin') !== true) return
   data.localServerPort = store.getUserData('localServerPort')
   let newWindow = getWindow(windowId)
   if (!newWindow) {
@@ -309,12 +317,7 @@ const onClearContactApplyCount = () => {
  */
 const onLoginOut = (callback) => {
   ipcMain.on('reLogin', async (e) => {
-    callback()
-    e.sender.send('reLogin')
-    //关闭ws链接
-    closeWs()
-    //关闭本地媒体服务器
-    closeLocalServer()
+    await clearDesktopSession({ store, closeSocket: closeWs, closeMedia: closeLocalServer, windows: BrowserWindow.getAllWindows(), mainWindow: getWindow('main'), resetWindow: callback })
   })
 }
 

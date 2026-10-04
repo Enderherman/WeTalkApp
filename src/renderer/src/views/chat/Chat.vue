@@ -46,6 +46,10 @@
         @click="showGroupDetail"
       ></span>
       <div v-show="Object.keys(currentChatSession).length > 0" class="chat-panel">
+        <div v-if="connectionState !== 'connected'" class="connection-status" role="status">
+          {{ connectionState === 'failed' ? '连接恢复失败' : '正在恢复实时连接' }}，文字消息会保存到待发队列。
+          <button v-if="connectionState === 'failed'" type="button" @click="retryConnection">重新连接</button>
+        </div>
         <!--信息框-->
         <div id="message-panel" class="message-panel">
           <div class="history-controls">
@@ -262,6 +266,7 @@ const jumpToHistoryMessage = async (message) => {
   } finally { if (version === historyLocationGeneration) locatingHistory.value = false }
 }
 const outboxState = reactive({ items: [], online: true, ready: false, error: '' })
+const connectionState = ref('connecting')
 const outboxUserId = userInfoStore.getInfo().userId
 const outbox = createTextOutbox({
   state: outboxState,
@@ -297,7 +302,12 @@ const queueTextMessage = async (messageContent) => {
   }
   catch (error) { Message.error(error.message || '无法保存待发消息，请重试'); return false }
 }
-const onConnectionState = (event, state) => { void outbox.setOnline(state === 'connected') }
+const onConnectionState = (event, state) => {
+  connectionState.value = state
+  void outbox.setOnline(state === 'connected')
+  if (state === 'reconnecting' || state === 'failed') void Request({ url: Api.getUserInfo, showLoading: false, showError: false })
+}
+const retryConnection = () => window.ipcRenderer.send('retryConnection')
 let chatDisposed = false
 const aiState = reactive({ stoppingId: null, errors: {} })
 const stopAiMessage = createAiStopper({
@@ -453,6 +463,7 @@ const onReceiveMessage = () => {
       return
     }
     if (message.messageType === 0) {
+      connectionState.value = 'connected'
       void outbox.setOnline(true)
       loadChatSession()
       loadContactApply()
@@ -871,6 +882,7 @@ watch(
 </script>
 
 <style scoped lang="less">
+.connection-status { padding: 6px 12px; color: #875800; background: #fff8df; font-size: 12px; }
 .history-search-form { display: flex; gap: 8px; }
 .history-search-form .el-select { width: 150px; flex-shrink: 0; }
 .history-search-results { list-style: none; padding: 0; max-height: 400px; overflow: auto; }

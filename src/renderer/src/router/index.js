@@ -1,4 +1,5 @@
 import { createRouter, createWebHashHistory } from 'vue-router'
+import { desktopRouteAccess } from '@/utils/routeAccess.mjs'
 
 const router = createRouter({
   history: createWebHashHistory(import.meta.env.BASE_URL),
@@ -130,5 +131,10 @@ const router = createRouter({
       ]
     }
   ]
+})
+router.beforeEach((to) => {
+  let profile
+  try { profile = JSON.parse(localStorage.getItem('userInfo') || 'null') } catch { profile = null }
+  return desktopRouteAccess(to.path, localStorage.getItem('token'), profile)
 })
 export default router
