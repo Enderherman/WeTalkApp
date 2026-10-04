@@ -1,8 +1,8 @@
 # Windows NSIS 安装包构建验收
 
-日期：2026-10-04。最新测试包源码提交：`a5f96bdbc448b7bd25903370fb0bd5a53e6b94f7`，构建开始时与 `origin/master` 一致、工作区干净。
+日期：2026-10-04。最新测试包源码提交：`de22cd02250b1c374c8cfccd95727dc7a6b985c6`，构建开始时与 `origin/master` 一致、工作区干净。
 
-本次已在HEVC处理、账号隔离及同账号多端最终消息metadata合并后重建安装包；首轮 `3ff96f9` 旧包稳定副本仍保留。此包只代表上面明确的源码快照，后续代码更改需另行复验，不能把本页哈希自动视为后续HEAD的产物。视频链路验收见 `hevc-processing-verification.md`。
+本次已在HEVC处理、账号隔离、同账号多端最终消息metadata合并、申请拉黑状态修正，以及搜索结果发送消息入口接通后重建最终测试包；同时移除了图片组件中未定义的冗余点击绑定，保留外层实际预览行为。`3ff96f9`、`a5f96bd` 两个旧包稳定副本仍保留。此包只代表上面明确的源码快照，后续代码更改需另行复验，不能把本页哈希自动视为后续HEAD的产物；仅更新本页文档不会改变安装包源码快照。视频链路验收见 `hevc-processing-verification.md`。
 
 本次完成完整 NSIS 安装包构建和静态资源/字节验证。**没有运行安装器、安装应用、打开打包后的 WeTalkApp.exe、发布 Release 或部署 NAS。** 这是仓库默认本机目标的构建验收产物；正式域名及 NAS 发布入口仍留待整体功能完成后确定。
 
@@ -38,7 +38,7 @@ set ELECTRON_BUILDER_CACHE=D:\environment\WeTalkBrowserQA\electron-builder-cache
 D:\environment\Node\current\npm.cmd run build:win -- --publish never
 ```
 
-main/preload/renderer 构建、NSIS 构建、blockmap 生成均成功，最终退出码 0。npm mirror 配置和 Sass legacy API 的既有提示没有导致失败。构建前已将旧安装器、blockmap 和 latest.yml 复制到本机独立验证目录，未删除旧备份。
+打包前桌面最终全套回归106/106通过，失败0、跳过0，显式启用真实HEVC及Chromium分支。随后本次main/preload/renderer 构建、NSIS 构建、blockmap 生成均成功，最终退出码 0。npm mirror 配置和 Sass legacy API 的既有提示没有导致失败。旧安装器、blockmap 和 latest.yml 的独立稳定副本均保留；构建前重新核对两份旧安装器哈希。
 
 ## 产物
 
@@ -46,15 +46,15 @@ main/preload/renderer 构建、NSIS 构建、blockmap 生成均成功，最终�
 
 | 文件 | 大小（字节） | SHA-256 |
 |---|---:|---|
-| `WeTalkAppSetup.1.0.0.exe` | 200913887 | `e04d0d72fc806e7f04f84b338d0fd6ed219f4d1ce29032eafd42408069319c0e` |
-| `WeTalkAppSetup.1.0.0.exe.blockmap` | 208385 | `8f0dcb3a1d2ee33fa6ce7989f04313c7a1bb637cb134d46cfc24e277d7b91e09` |
-| `latest.yml` | 345 | `215d83be0a80ff6c870db73eff39d46d33077345db38546c47aa306ba367cb65` |
+| `WeTalkAppSetup.1.0.0.exe` | 200923228 | `770f0313699acbdddb6969922cbd46a058e950903c72893bdc0b18c0b8937faa` |
+| `WeTalkAppSetup.1.0.0.exe.blockmap` | 208363 | `92a677604f5c18689049ab3672df23f53f4639d04c2f810cd4a1ed6374700f76` |
+| `latest.yml` | 345 | `f8376e891f9af3797266d09196015e51f6697407fe2bdf3ec31ccf1b32f1d363` |
 
-安装器约 191.61 MiB。`latest.yml` 的文件名、大小与 SHA-512 已按实际安装器重算并逐项一致；生成该本地元数据不等于发布更新。
+安装器约 191.62 MiB。`latest.yml` 的文件名、大小与 SHA-512 已按实际安装器重算并逐项一致；生成该本地元数据不等于发布更新。
 
-为避免后续构建覆盖，本次安装器另保存为 `D:/environment/WeTalkParityQA/20261004/nsis-verification/WeTalkAppSetup.1.0.0-default-local-a5f96bd.exe`，并保留同名blockmap与 `latest-a5f96bd.yml`。完整验证结果为同目录 `verification-a5f96bd.json`，检查脚本为 `verify-package-a5f96bd.cjs`。
+为避免后续构建覆盖，本次安装器另保存为 `D:/environment/WeTalkParityQA/20261004/nsis-verification/WeTalkAppSetup.1.0.0-default-local-de22cd0.exe`，并保留同名blockmap与 `latest-de22cd0.yml`。完整验证结果为同目录 `verification-de22cd0.json`，检查脚本为 `verify-package-de22cd0.cjs`；构建日志为 `build-de22cd0.log`，内嵌归档完整性与提取日志为 `archive-test-de22cd0.log` / `archive-extract-de22cd0.log`，稳定副本回读结果为 `stable-archive-de22cd0.json`。
 
-首轮稳定副本 `WeTalkAppSetup.1.0.0-default-local-3ff96f9.exe` 保持原样；重建前重新核对其SHA-256仍为 `f48147f00c11fc393b13184f795ab6118485c82ce424926bb47d5d49079ac656`，大小200902142字节。旧 `verification.json` / `verify-package.cjs` 也保留，不能与a5结果混用。
+首轮稳定副本 `WeTalkAppSetup.1.0.0-default-local-3ff96f9.exe` 保持原样；重建前重新核对其SHA-256仍为 `f48147f00c11fc393b13184f795ab6118485c82ce424926bb47d5d49079ac656`，大小200902142字节。`WeTalkAppSetup.1.0.0-default-local-a5f96bd.exe` 的SHA-256仍为 `e04d0d72fc806e7f04f84b338d0fd6ed219f4d1ce29032eafd42408069319c0e`，大小200913887字节。旧验证JSON、脚本与提取目录均保留，不能与de22结果混用。
 
 ## 实际安装器内资源验证
 
@@ -64,13 +64,13 @@ main/preload/renderer 构建、NSIS 构建、blockmap 生成均成功，最终�
 
 | 安装器内相对路径 | 大小（字节） | SHA-256 |
 |---|---:|---|
-| `resources/app.asar` | 97828676 | `c90e1a32b3311cb84122d4abf549132fd059ac765cbc01ade7c45837571507d0` |
+| `resources/app.asar` | 97844280 | `6f676ba410f63fd9ceb27c500c48ea6fb686a4276e7bd34e7f6e6dd640ce6358` |
 | `resources/app.asar.unpacked/node_modules/sqlite3/lib/binding/napi-v6-win32-unknown-x64/node_sqlite3.node` | 1851904 | `7fb52b781709b065c240b6b81394be6e72e53fe11d7c8e0f7b49dd417eb78a01` |
 | `resources/app.asar.unpacked/node_modules/ffmpeg-static/ffmpeg.exe` | 81114624 | `e9fd5e711debab9d680955fc1e38a2c1160fd280b144476cc3f62bc43ef49db1` |
 | `resources/app.asar.unpacked/node_modules/ffprobe-static/bin/win32/x64/ffprobe.exe` | 63059968 | `4303ec85855340689b1f8aa5d9c1dc06ef3e3090682de3034edc3fca2b0798d5` |
 | `resources/assets/default_avatar.png` | 437451 | `da75f4a370606ac4dbbb6879234ff4f1b7ddb04fbf3298037902ad0ee13bc71f` |
 
-默认头像还与源码 `assets/default_avatar.png` 字节一致。ASAR 内未嵌套旧 `installPackages` 目录。
+默认头像还与源码 `assets/default_avatar.png` 字节一致。ASAR 内未嵌套旧 `installPackages` 目录。包内57个main/preload/renderer编译文件与本轮 `out/` 对应文件逐字节一致，包括最终 `Search-9c6a4bcf.js` 与 `ContactApply-c22edfa0.js`。
 
 包内主进程 `out/main/index.js` SHA-256为 `1cc63f4eeb5f63575333817577513d5c32f643081cb4e072e423a3e7c61e365c`；preload为 `4a486c59db940ddb1895b5684bcbb778838dc3e9feb944bbf52e452311996dac`。
 

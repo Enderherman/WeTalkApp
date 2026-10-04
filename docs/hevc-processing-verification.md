@@ -43,4 +43,6 @@
 
 `node --test tests/outgoingMedia.test.mjs tests/avatarCover.test.mjs tests/localMediaServer.test.mjs tests/cachedUploadFile.test.mjs tests/fileUpload.test.mjs` 共22项通过、无跳过；实际Chromium分支在设置 `WETALK_PLAYWRIGHT_PACKAGE` 与 `PLAYWRIGHT_BROWSERS_PATH` 后执行。`WETALK_HEVC_EVIDENCE_DIR` 可选指定生成证据的目录。`npm run build` 验证main/preload/renderer。
 
-首轮NSIS安装器 `f48147f0…` 只对应源码 `3ff96f9`；后续已基于包含本次修改及最终metadata合并的 `a5f96bd` 重建测试包，SHA-256为 `e04d0d72fc806e7f04f84b338d0fd6ed219f4d1ce29032eafd42408069319c0e`。两个源码快照的稳定副本均保留，详见 `windows-package-verification.md`；安装器与打包应用主程序均未运行。
+最终桌面全套回归在 `de22cd0` 达到106/106通过、失败0、跳过0，显式启用真实HEVC及Chromium分支。随后基于该源码快照重建NSIS最终测试包，SHA-256为 `770f0313699acbdddb6969922cbd46a058e950903c72893bdc0b18c0b8937faa`，稳定副本为 `D:/environment/WeTalkParityQA/20261004/nsis-verification/WeTalkAppSetup.1.0.0-default-local-de22cd0.exe`。包内实际media处理调用、`yuv420p`、最终metadata合并及57个编译文件与本轮构建输出均通过静态验证。
+
+首轮NSIS安装器 `f48147f0…` 对应源码 `3ff96f9`，第二轮 `e04d0d72…` 对应包含HEVC修改及最终metadata合并的 `a5f96bd`；三个源码快照的稳定副本与验证记录均保留，详见 `windows-package-verification.md`。安装器与打包应用主程序均未运行。
