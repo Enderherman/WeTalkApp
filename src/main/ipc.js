@@ -334,6 +334,12 @@ const onOpenLocalFolder = () => {
  * 获取本地存储目录
  */
 const onGetSysSetting = () => {
+  ipcMain.on('systemSettingsUpdated', () => {
+    if (store.getUserData('admin') !== true) return
+    for (const window of BrowserWindow.getAllWindows()) {
+      if (!window.isDestroyed()) window.webContents.send('systemSettingsUpdated')
+    }
+  })
   ipcMain.on('getSysSetting', async (e) => {
     let result = await selectSettingInfo()
     let sysSetting = result.sysSetting

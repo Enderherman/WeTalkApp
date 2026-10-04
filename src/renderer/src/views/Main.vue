@@ -134,6 +134,7 @@ const menuSelect = (path) => {
 onMounted(() => {
   getLoginInfo()
   getSystemSetting()
+  window.ipcRenderer.on('systemSettingsUpdated', getSystemSetting)
   window.ipcRenderer.on('getLocalStoreCallback', (e, serverPort) => {
     globalInfoStore.setInfo('localServerPort', serverPort)
   })
@@ -156,6 +157,7 @@ watch(
 )
 
 onUnmounted(() => {
+  window.ipcRenderer.removeListener('systemSettingsUpdated', getSystemSetting)
   window.ipcRenderer.removeAllListeners('getLocalStoreCallback')
   window.ipcRenderer.removeAllListeners('reLogin')
 })

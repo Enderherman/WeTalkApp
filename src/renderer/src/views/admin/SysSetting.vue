@@ -70,51 +70,51 @@
         ></el-input>
       </el-form-item>
       <el-form-item label="">
-        <el-button type="primary" @click="saveSysSetting">保存设置</el-button>
+        <el-button type="primary" :loading="saving" @click="saveSysSetting">保存设置</el-button>
       </el-form-item>
     </el-form>
   </div>
 </template>
 
 <script setup>
-import Verify from '@/utils/Verify'
 import AvatarUpload from '@/components/AvatarUpload.vue'
 import { onMounted, ref } from 'vue'
 import Request from '@/utils/Request'
 import Api from '@/utils/Api'
 import Message from '@/plugin/Message'
+import { isPositiveQuota, normalizeSystemSettings } from '@/utils/systemSettingValidation.mjs'
 
 const formData = ref({})
 const formDataRef = ref()
+const saving = ref(false)
+const validateQuota = (rule, value, callback) => callback(isPositiveQuota(value) ? undefined : new Error('请输入正整数'))
 
 const rules = {
   maxGroupCount: [
     { required: true, message: '请输入每人最多可创建群组数' },
-    { validator: Verify.number, message: '只能是数字' }
+    { validator: validateQuota }
   ],
   maxGroupMemberCount: [
     {
       required: true,
       message: '请输入每个群组最大成员数'
     },
-    { validator: Verify.number, message: '只能是数字' }
+    { validator: validateQuota }
   ],
   maxImageSize: [
     { required: true, message: '请输入允许上传的图片大小' },
-    { validator: Verify.number, message: '只能是数字' }
+    { validator: validateQuota }
   ],
   maxVideoSize: [
     { required: true, message: '请输入允许上传的视频大小' },
     {
-      validator: Verify.number,
-      message: '只能是数字'
+      validator: validateQuota
     }
   ],
-  maxFilesize: [
+  maxFileSize: [
     { required: true, message: '请输入允许上传的文件大小' },
     {
-      validator: Verify.number,
-      message: '只能是数字'
+      validator: validateQuota
     }
   ],
   robotNickName: [
@@ -156,20 +156,22 @@ const getSysSetting = async () => {
 }
 
 const saveSysSetting = async () => {
+  if (saving.value) return
   formDataRef.value.validate(async (valid) => {
     if (!valid) {
       return
     }
-    let params = {}
-    Object.assign(params, formData.value)
-    let result = await Request({
-      url: Api.saveSysSetting,
-      params
-    })
-    if (!result) {
-      return
-    }
-    Message.success('修改系统信息成功')
+    let params
+    try { params = normalizeSystemSettings(formData.value) }
+    catch (error) { Message.error(error.message); return }
+    saving.value = true
+    try {
+      const result = await Request({ url: Api.saveSysSetting, params })
+      if (!result) return
+      Object.assign(formData.value, params)
+      window.ipcRenderer.send('systemSettingsUpdated')
+      Message.success('修改系统信息成功')
+    } finally { saving.value = false }
   })
 }
 
