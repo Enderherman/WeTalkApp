@@ -67,10 +67,10 @@ const addUserSetting = async (userId, email) => {
     resultServerPort = serverPort
     localFileFolder = path.join(systemSettingInfo.localFileFolder, userId)
   }
-  //启动本地服务
-  startLocalServer(resultServerPort)
   store.setUserData('localServerPort', resultServerPort)
   store.setUserData('localFileFolder', localFileFolder)
+  // 配置先可用，再等待仅监听 loopback 的媒体服务就绪；错误交给登录流程处理。
+  await startLocalServer(resultServerPort)
 }
 
 /**

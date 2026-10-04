@@ -6,13 +6,15 @@ const NODE_ENV = process.env.NODE_ENV
 const path = require('path')
 const { app, shell } = require('electron')
 const FormData = require('form-data') //引入FormData模块（用于构建表单数据)
-const axios = require('axios') // 引入axios库
 import store from './store'
 import { dialog } from 'electron'
 import { selectSettingInfo, updateSysSetting } from './database/UserSettingModel'
 import { getWindow } from './windowProxy'
 import { uploadFileRequest } from './utils/fileUpload.mjs'
 import { downloadUpdatePackage } from './utils/updateDownload.mjs'
+import { MediaRequestError, listenLocalMediaServer, resolveMediaPath } from './utils/localMediaServer.mjs'
+import { downloadMediaToCache } from './utils/mediaDownload.mjs'
+import { getDesktopRendererOrigin } from './utils/desktopRendererOrigin'
 
 // 引入 ffmpeg 相关包
 const ffmpeg = require('fluent-ffmpeg')
@@ -22,13 +24,6 @@ const ffprobePath = require('ffprobe-static').path
 // 配置 ffmpeg 路径
 ffmpeg.setFfmpegPath(ffmpegPath)
 ffmpeg.setFfprobePath(ffprobePath)
-
-const moment = require('moment')
-moment.locale(' zh-cn', {})
-
-//express 服务器
-const express = require('express')
-const expressServer = express()
 
 const cover_image_suffix = '_cover.png'
 const image_suffix = '.png'
@@ -190,185 +185,59 @@ const getDomainPath = () => {
  * 获取模块路径
  */
 const getResourcesPath = () => {
-  let resourcePath = app.getAppPath()
-  if (NODE_ENV !== 'development') {
-    resourcePath = path.dirname(app.getPath('exe') + '/resources')
-  }
-  return resourcePath
+  return NODE_ENV === 'development' ? app.getAppPath()
+    : process.resourcesPath || path.join(path.dirname(app.getPath('exe')), 'resources')
 }
 
 /**
  * 获取路径
  */
-const getLocalFilePath = (partType, showCover, fileId) => {
-  return new Promise((resolve) => {
-    let localFolder = store.getUserData('localFileFolder')
-    let localPath = null
-    if (partType === 'avatar') {
-      localFolder = localFolder + '/avatar/'
-      if (!fs.existsSync(localFolder)) {
-        fs.mkdirSync(localFolder, { recursive: true })
-      }
-      localPath = localFolder + fileId + image_suffix
-    } else if (partType === 'chat') {
-      selectChatMessagesByMessageId(fileId).then((messageInfo) => {
-        const month = moment(Number.parseInt(messageInfo.sendTime)).format('YYYYMM')
-        localFolder = localFolder + '/' + month
-        if (!fs.existsSync(localFolder)) {
-          //递归创建目录
-          fs.mkdirSync(localFolder, { recursive: true })
-        }
-        let fileSuffix = messageInfo.fileName
-        fileSuffix = fileSuffix.substring(fileSuffix.lastIndexOf('.'))
-        localPath = localFolder + '/' + fileId + fileSuffix
-        if (showCover) {
-          localPath = localPath + cover_image_suffix
-        }
-        resolve(localPath)
-      })
-      return
-    } else if (partType === 'tmp') {
-      localFolder = localFolder + '/temp/'
-      if (!fs.existsSync(localFolder)) {
-        fs.mkdirSync(localFolder, { recursive: true })
-      }
-      localPath = localFolder + fileId
-    }
-    if (showCover) {
-      localPath = localPath + cover_image_suffix
-    }
-    console.log('localPath: ', localPath)
-    resolve(localPath)
-  })
-}
+const getLocalFilePath = (partType, showCover, fileId) => resolveMediaPath({
+  directory: store.getUserData('localFileFolder'), partType, showCover, fileId,
+  loadMessage: selectChatMessagesByMessageId
+})
 
 /**
  * 图片服务器
  */
 let server = null
+let serverOperation = Promise.resolve()
 const startLocalServer = (serverPort) => {
-  server = expressServer.listen(serverPort, () => {
-    console.log('本地服务server start 在 localhost:' + serverPort)
+  const accountId = store.getUserId()
+  const directory = store.getUserData('localFileFolder')
+  const token = store.getUserData('token')
+  const isActive = () => store.getUserId() === accountId && store.getUserData('token') === token
+  serverOperation = serverOperation.catch(() => {}).then(async () => {
+    await stopCurrentServer()
+    if (!isActive()) throw new MediaRequestError(401)
+    server = await listenLocalMediaServer({
+      getContext: () => ({ accountId, directory, token, isActive }),
+      allowedOrigins: () => {
+        const origins = [getDesktopRendererOrigin()]
+        if (process.env.ELECTRON_RENDERER_URL) origins.push(new URL(process.env.ELECTRON_RENDERER_URL).origin)
+        return origins.filter(Boolean)
+      },
+      resolveFile: (query, context) => resolveMediaPath({ ...query, directory: context.directory, loadMessage: selectChatMessagesByMessageId }),
+      downloadFile: (query, savePath, context) => downloadMediaToCache({
+        ...query, savePath, ...context, url: `${getDomainPath()}/api/chat/downloadFile`,
+        fallbackAvatarPath: path.join(getResourcesPath(), 'assets/default_avatar.png')
+      })
+    }, serverPort)
+  })
+  return serverOperation
+}
+const stopCurrentServer = async () => {
+  const previous = server
+  server = null
+  if (!previous) return
+  await new Promise((resolve, reject) => {
+    previous.close((error) => error && error.code !== 'ERR_SERVER_NOT_RUNNING' ? reject(error) : resolve())
+    previous.closeAllConnections?.()
   })
 }
 const closeLocalServer = () => {
-  if (server) {
-    server.close()
-  }
-}
-const FILE_TYPE_CONTENT_TYPE = {
-  0: 'image/',
-  1: 'video/',
-  2: 'application/octet-stream'
-}
-/**
- * get方法从端口
- */
-//TODO sendP5
-expressServer.get('/file', async (req, res) => {
-  let { partType, fileType, fileId, showCover, forceGet } = req.query
-  if (!partType || !fileId) {
-    res.send('请求参数错误')
-  }
-  if (showCover === 'false') {
-    showCover = false
-  } else {
-    showCover = showCover === undefined ? false : Boolean(showCover)
-  }
-  const localPath = await getLocalFilePath(partType, showCover, fileId)
-  if (!fs.existsSync(localPath) || forceGet === 'true') {
-    if (forceGet === 'true' && partType === 'avatar') {
-      await downloadFile(fileId, true, localPath + cover_image_suffix, partType)
-    }
-    await downloadFile(fileId, showCover, localPath, partType)
-  }
-  const fileSuffix = localPath.substring(localPath.lastIndexOf('.') + 1)
-  let contentType = FILE_TYPE_CONTENT_TYPE[fileType] + fileSuffix
-  res.setHeader('Content-Type', contentType)
-  res.setHeader('Access-Control-Allow-Origin', '*')
-  if (showCover || fileType !== '1') {
-    fs.createReadStream(localPath).pipe(res)
-    return
-  }
-  let stat = fs.statSync(localPath)
-  let fileSize = stat.size
-  let range = req.headers.range
-  console.log(range, 'range')
-  if (range) {
-    let parts = range.replace(/bytes=/, '').split('-')
-    let start = parseInt(parts[0], 10)
-    let end = parts[1] ? parseInt(parts[1], 10) : start + 999999
-    end = end > fileSize - 1 ? fileSize - 1 : end
-    let chunkSize = end - start + 1
-    let stream = fs.createReadStream(localPath, { start, end })
-    let head = {
-      'Content-Range': `bytes ${start}-${end}/${fileSize}`,
-      'Accept-Ranges': 'bytes',
-      'Content-Length': chunkSize,
-      'Content-Type': 'video/mp4'
-    }
-    res.writeHead(206, head)
-    stream.pipe(res)
-  } else {
-    let head = {
-      'Content-Length': fileSize,
-      'Content-Type': 'video/mp4'
-    }
-    res.writeHead(200, head)
-    fs.createReadStream(localPath).pipe(res)
-  }
-})
-
-//TODO 从服务器下载文件
-const downloadFile = (fileId, showCover, savePath, partType) => {
-  showCover = showCover + ''
-  let url = getDomainPath() + '/api/chat/downloadFile'
-  const token = store.getUserData('token')
-  return new Promise((resolve, reject) => {
-    let formData = new FormData()
-    formData.append('fileId', fileId)
-    formData.append('showCover', showCover)
-    const config = {
-      responseType: 'stream',
-      headers: {
-        'Content-Type': 'multipart/form-data',
-        token: token
-      }
-    }
-    axios
-      .post(url, formData, config)
-      .then((response) => {
-        const folderPath = savePath.substring(0, savePath.lastIndexOf('/'))
-        if (!fs.existsSync(folderPath)) {
-          fs.mkdirSync(folderPath, { recursive: true })
-        }
-        const stream = fs.createWriteStream(savePath)
-        console.log('我在响应中---------------\n', response.headers)
-        if (response.headers['content-type'] === 'application/json') {
-          let resourcePath = getResourcesPath()
-          console.log('我从本地取了')
-          if (partType === 'avatar') {
-            fs.createReadStream(resourcePath + '/assets/default_avatar.png').pipe(stream)
-          } else {
-            fs.createReadStream(resourcePath + '/assets/404.png').pipe(stream)
-          }
-        } else {
-          response.data.pipe(stream)
-        }
-        stream.on('finish', () => {
-          stream.close()
-          resolve()
-        })
-        stream.on('error', (err) => {
-          console.log('牛处问ti1le')
-          stream.close()
-          reject(err)
-        })
-      })
-      .catch((err) => {
-        reject(err)
-      })
-  })
+  serverOperation = serverOperation.catch(() => {}).then(stopCurrentServer)
+  return serverOperation
 }
 
 /**
@@ -402,7 +271,7 @@ const createCover = (filePath) => {
           reject(err)
         })
         .run()
-    })
+    }).catch(reject)
   })
 }
 
