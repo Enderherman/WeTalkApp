@@ -42,7 +42,13 @@
       ]"
     >
       <div v-if="data.contactType === 1" class="nick-name">{{ data.sendUserName }}</div>
-      <div v-if="data.status === 0" class="sending">
+      <div v-if="aiState" class="ai-message">
+        <div class="content">{{ messageText(data.messageContent) || aiStateLabels[aiState] }}</div>
+        <div class="ai-status" aria-live="polite">{{ aiStateLabels[aiState] }}</div>
+        <button v-if="aiState === 'waiting' || aiState === 'streaming'" type="button" :disabled="aiStopping" @click="emit('stopAi', data)">{{ aiStopping ? '正在停止…' : '停止生成' }}</button>
+        <p v-if="aiError" role="alert">{{ aiError }}</p>
+      </div>
+      <div v-else-if="data.status === 0" class="sending">
         <el-skeleton :animated="true">
           <template #template>
             <el-skeleton-item class="skeleton-item" variant="image" />
@@ -73,6 +79,9 @@ import ChatMessageVideo from '@/views/chat/ChatMessageVideo.vue'
 import { useUserInfoStore } from '@/stores/UserInfoStore'
 import ChatMessageFile from '@/views/chat/ChatMessageFile.vue'
 import { messageText } from '@/utils/messageText.mjs'
+import { computed } from 'vue'
+import { useSysSettingStore } from '@/stores/SystemSettingStore'
+import { aiMessageState, aiStateLabels } from '@/utils/aiMessages.mjs'
 
 const userInfoStore = useUserInfoStore()
 const props = defineProps({
@@ -83,9 +92,13 @@ const props = defineProps({
   currentChatSession: {
     type: Object,
     default: {}
-  }
+  },
+  aiStopping: Boolean,
+  aiError: String
 })
-const emit = defineEmits(['showMediaDetail', 'retryMessage'])
+const sysSettingStore = useSysSettingStore()
+const aiState = computed(() => aiMessageState(props.data, sysSettingStore.getSetting().robotUid))
+const emit = defineEmits(['showMediaDetail', 'retryMessage', 'stopAi'])
 const showDetail = () => {
   if (props.data.status === 0) {
     return
@@ -96,6 +109,7 @@ const showDetail = () => {
 
 <style scoped lang="less">
 .read-receipt { color: #667085; font-size: 12px; margin-top: 4px; }
+.ai-status { color: #667085; font-size: 12px; margin: 4px 0; }
 .sending {
   width: 170px;
   height: 170px;

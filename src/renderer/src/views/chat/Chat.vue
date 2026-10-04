@@ -92,8 +92,11 @@
               <ChatMessage
                 :data="data"
                 :current-chat-session="currentChatSession"
+                :ai-stopping="aiState.stoppingId === data.messageId"
+                :ai-error="aiState.errors[data.messageId]"
                 @show-media-detail="showMediaDetailHandler"
                 @retry-message="retryFileMessage"
+                @stop-ai="stopAiMessage"
               ></ChatMessage>
             </template>
           </div>
@@ -143,6 +146,7 @@ import Api from '@/utils/Api'
 import { createHistoryPager, mergeHistoryMessages } from '@/utils/historyPaging.mjs'
 import { useUserInfoStore } from '@/stores/UserInfoStore'
 import { createReadCursorWriter, canMarkVisibleSession } from '@/utils/readCursor.mjs'
+import { createAiStopper } from '@/utils/aiMessages.mjs'
 
 const route = useRoute()
 const userInfoStore = useUserInfoStore()
@@ -186,6 +190,16 @@ let distanceToBottom = 0
 const currentChatSession = ref({})
 //消息列表
 const messageList = ref([])
+let chatDisposed = false
+const aiState = reactive({ stoppingId: null, errors: {} })
+const stopAiMessage = createAiStopper({
+  request: Request, state: aiState,
+  isActive: () => !chatDisposed,
+  onMessage: async (message) => {
+    receiveAiStreamMessage(message)
+    await window.ipcRenderer.invoke('cacheChatHistory', { userId: userInfoStore.getInfo().userId, messages: [{ ...message, messageType: 14 }] })
+  }
+})
 let chatActive = true
 const readWriter = createReadCursorWriter({
   send: async (contactId, messageId) => Boolean(await Request({ url: Api.markRead, params: { contactId, messageId }, showLoading: false, showError: false })),
@@ -315,12 +329,6 @@ const receiveAiStreamMessage = (message) => {
   if (message.sessionId !== currentChatSession.value.sessionId) return
 
   const aiMessage = { ...message, messageType: 14 }
-  if (!aiMessage.messageContent) {
-    const finalStatus = Number(aiMessage.status)
-    if (finalStatus === 2) aiMessage.messageContent = 'AI 生成已停止'
-    else if (finalStatus === 3) aiMessage.messageContent = 'AI 生成失败，请重试'
-    else if (finalStatus === 1) aiMessage.messageContent = 'AI 没有返回文本'
-  }
   const index = messageList.value.findIndex((item) => item.messageId === aiMessage.messageId)
   if (index >= 0) messageList.value.splice(index, 1, aiMessage)
   else messageList.value.push(aiMessage)
@@ -590,6 +598,7 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  chatDisposed = true
   readWriter.dispose()
   window.removeEventListener('focus', syncVisibleSession)
   window.removeEventListener('blur', syncVisibleSession)

@@ -6,13 +6,14 @@ import { compile } from '@vue/compiler-dom'
 import * as Vue from 'vue'
 import { renderToString } from '@vue/server-renderer'
 import { messageText, highlightText } from '../src/renderer/src/utils/messageText.mjs'
+import { aiStateLabels } from '../src/renderer/src/utils/aiMessages.mjs'
 
 async function renderTemplate(filename, state) {
   const source = await readFile(new URL(`../src/renderer/src/views/chat/${filename}`, import.meta.url), 'utf8')
   const { descriptor } = parse(source)
   const { code } = compile(descriptor.template.content, { mode: 'function' })
   const render = new Function('Vue', code)(Vue)
-  const app = Vue.createSSRApp({ render, setup: () => state })
+  const app = Vue.createSSRApp({ render, setup: () => ({ aiState: null, aiError: '', aiStopping: false, currentChatSession: {}, ...state }) })
   app.config.warnHandler = () => {}
   return renderToString(app)
 }
@@ -42,4 +43,10 @@ test('actual search template highlights safe text without interpreting HTML', as
   assert.doesNotMatch(html, /<img\s+src=x|<script>/)
   assert.match(html, /class="highlight">img/)
   assert.match(html, /&lt;script&gt;/)
+})
+
+test('actual AI template shows cumulative text while generation is pending', async () => {
+  const html = await renderTemplate('ChatMessage.vue', { data: { sendUserId: 'robot', messageType: 14, status: 0, messageContent: '已有部分回答' }, userInfoStore: { getInfo: () => ({ userId: 'self' }) }, messageText, aiState: 'streaming', aiStateLabels, aiStopping: false })
+  assert.match(html, /已有部分回答/)
+  assert.match(html, /停止生成/)
 })
