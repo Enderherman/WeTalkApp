@@ -18,6 +18,8 @@ import { getDesktopRendererOrigin } from './utils/desktopRendererOrigin'
 import { createAvatarCover } from './utils/avatarCover.mjs'
 import { mediaExecutablePath } from './utils/mediaExecutable.mjs'
 import { appendCachedUploadFile } from './utils/cachedUploadFile.mjs'
+import { createMediaProcessors } from './utils/mediaProcessing.mjs'
+import { processOutgoingMedia } from './utils/outgoingMedia.mjs'
 
 // 引入 ffmpeg 相关包
 const ffmpeg = require('fluent-ffmpeg')
@@ -28,7 +30,8 @@ const ffprobePath = mediaExecutablePath(require('ffprobe-static').path)
 ffmpeg.setFfmpegPath(ffmpegPath)
 ffmpeg.setFfprobePath(ffprobePath)
 
-const cover_image_suffix = '_cover.png'
+const { getVideoCodec, convertHevcToH264, generateThumbnail } = createMediaProcessors(ffmpeg)
+
 const image_suffix = '.png'
 
 /**
@@ -36,146 +39,31 @@ const image_suffix = '.png'
  * @param {string} messageId - 消息ID
  * @param {string} filePath - 原始文件路径
  * @param {number} fileType - 文件类型
- * @returns {Promise<void>}
+ * @returns {Promise<object>} 处理后文件的名称、实际大小和缓存位置
  */
 const saveFileToLocal = async (messageId, filePath, fileType) => {
+  const accountId = store.getUserId()
   const token = store.getUserData('token')
-  try {
-    const messageInfo = await selectChatMessagesByMessageId(messageId)
-    if (!messageInfo?.fileName) throw new Error('无法读取文件消息原始名称')
-    // 获取保存路径
-    let savePath = await getLocalFilePath('chat', false, messageId)
-    savePath = path.normalize(savePath)
-    let coverPath = null
-    // 复制文件
-    fs.copyFileSync(filePath, savePath)
-    // 处理非文件类型文件
-    if (fileType !== 2) {
-      // 1.获取视频编码类型
-      const codecInfo = await getVideoCodec(filePath)
-      const codeName = codecInfo ? codecInfo.toLowerCase() : ''
-      console.log('codename:', codeName)
-
-      // 2.如果是HEVC格式，转换为H.264
-      if (codeName === 'hevc') {
-        console.log(filePath, '是hevc')
-        // 2.1 先删除复制的文件
-        fs.rmSync(savePath)
-        // 2.2 转换格式
-        await convertHevcToH264(filePath, savePath)
-      }
-
-      // 3.生成缩略图
-      // Audio has no video stream; lack of a thumbnail must not reject it.
-      if (codecInfo) {
-        coverPath = savePath + cover_image_suffix
-        await generateThumbnail(savePath, coverPath)
-      }
-    }
-    // 上传文件
-    await uploadFile(messageId, savePath, coverPath, token, messageInfo.fileName)
-  } catch (error) {
-    console.error('保存文件失败:', error)
-    throw error
-  }
-}
-
-/**
- * 获取视频编码类型
- * @param {string} filePath - 文件路径
- * @returns {Promise<string>} - 编码类型
- */
-const getVideoCodec = (filePath) => {
-  return new Promise((resolve, reject) => {
-    ffmpeg.ffprobe(filePath, (err, metadata) => {
-      if (err) {
-        console.error('获取视频编码信息失败:', err)
-        reject(err)
-        return
-      }
-
-      const videoStream = metadata.streams.find((stream) => stream.codec_type === 'video')
-      if (videoStream) {
-        resolve(videoStream.codec_name)
-      } else {
-        resolve(null)
-      }
-    })
-  })
-}
-
-/**
- * 将HEVC格式转换为H.264
- * @param {string} inputPath - 输入文件路径
- * @param {string} outputPath - 输出文件路径
- * @returns {Promise<void>}
- */
-const convertHevcToH264 = (inputPath, outputPath) => {
-  return new Promise((resolve, reject) => {
-    ffmpeg(inputPath)
-      .outputOptions('-c:v', 'libx264')
-      .outputOptions('-crf', '20')
-      .output(outputPath)
-      .on('end', () => {
-        console.log('视频转码完成')
-        resolve()
-      })
-      .on('error', (err) => {
-        console.error('视频转码失败:', err)
-        reject(err)
-      })
-      .run()
-  })
-}
-
-/**
- * 生成缩略图
- * @param {string} inputPath - 输入文件路径
- * @param {string} outputPath - 输出文件路径
- * @returns {Promise<void>}
- */
-const generateThumbnail = (inputPath, outputPath) => {
-  return new Promise((resolve, reject) => {
-    ffmpeg(inputPath)
-      .output(outputPath)
-      .frames(1)
-      .outputOptions([
-        '-vf',
-        'scale=170:-1', // 宽 170，高等比
-        '-f',
-        'image2' // 强制 image2 格式
-      ])
-      .on('end', () => {
-        console.log('缩略图生成完成')
-        setTimeout(() => {
-          if (fs.existsSync(outputPath)) {
-            console.log('缩略图文件确认存在:', outputPath)
-            resolve()
-          } else {
-            console.error('缩略图生成失败: 文件不存在', outputPath)
-            reject(new Error('缩略图文件不存在'))
-          }
-        }, 100)
-      })
-      .on('error', (err) => {
-        console.error('缩略图生成失败:', err)
-        reject(err)
-      })
-      .run()
+  const directory = store.getUserData('localFileFolder')
+  const uploadUrl = `${getDomainPath()}/api/chat/uploadFile`
+  return processOutgoingMedia({
+    messageId, inputPath: filePath, fileType, accountId, directory,
+    isActive: () => Boolean(accountId && token && store.getUserId() === accountId && store.getUserData('token') === token),
+    loadMessage: selectChatMessagesByMessageId, getVideoCodec, convertHevcToH264, generateThumbnail,
+    upload: (prepared) => uploadFile(messageId, prepared.savePath, prepared.coverPath, token, prepared.fileName, uploadUrl)
   })
 }
 
 /**
  * 上传文件
  */
-const uploadFile = (messageId, savePath, coverPath, token, originalName) => {
+const uploadFile = (messageId, savePath, coverPath, token, originalName, url) => {
   const formData = new FormData()
   formData.append('messageId', messageId)
   appendCachedUploadFile(formData, savePath, originalName)
   if (coverPath) {
     formData.append('cover', fs.createReadStream(coverPath))
   }
-  const url = `${getDomainPath()}/api/chat/uploadFile`
   return uploadFileRequest(url, formData, token)
 }
 
