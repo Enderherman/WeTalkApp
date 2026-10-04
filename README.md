@@ -1,5 +1,12 @@
 # WeTalkApp
 
+## 同账号多端消息与文件完成同步（2026-10-04）
+
+- 对接本人文字/文件/AI提问镜像，HTTP接受与WebSocket回显按消息ID合并；回显按clientMessageId确认待发草稿，HTTP后到或超时不会出现第二条/复活已发送草稿。
+- type 6 使用完整最终文件名、大小、类型和状态更新气泡与SQLite，历史类型保持5；不增加未读，也不把新会话预览回退到较早附件。
+- SQLite按账号/消息串行合并，已完成的文件不会被迟到placeholder或失败回调覆盖；新旧库迁移保留clientMessageId。
+- `npm run test:message-mirror` 20项相关回归通过，详见 `docs/multi-device-message-sync.md`；真实双端镜像由隔离环境另行验收。
+
 ## Electron IPC 隔离（2026-10-04）
 
 - 主/子窗口启用 context isolation，渲染器仅获得白名单 `send/invoke/on`；回调不携带原生事件，订阅返回清理函数并随组件卸载。

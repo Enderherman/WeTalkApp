@@ -87,3 +87,36 @@ test('remark events update private contact metadata without adding history or un
   assert.equal(f.sessions.size, 0)
   assert.equal(f.emitted.length, 2)
 })
+
+test('file completion persists final metadata without another unread or a type 6 history row', async () => {
+  const f = fixture()
+  await f.sync({ ...message(5), fileName: 'clip.mov', fileSize: 1000, fileType: 1, status: 0 })
+  await f.sync({ ...message(6), fileName: 'clip.mov', fileSize: 640, fileType: 1, status: 1 })
+  await f.sync({ ...message(6), fileName: 'clip.mov', fileSize: 640, fileType: 1, status: 1 })
+  assert.equal(f.messages.size, 1)
+  assert.equal(f.messages.get(1).fileSize, 640)
+  assert.equal(f.messages.get(1).messageType, 5)
+  assert.equal(f.sessions.get('Upeer').noReadCount, 1)
+  assert.equal(f.emitted.at(-1).fileSize, 640)
+})
+
+test('an own completion arriving before its placeholder keeps final metadata and has zero unread', async () => {
+  const f = fixture()
+  await f.sync({ ...message(6), sendUserId: 'Uself', fileName: 'clip.mov', fileSize: 640, fileType: 1, status: 1 })
+  await f.sync({ ...message(5), sendUserId: 'Uself', fileName: 'clip.mov', fileSize: 1000, fileType: 1, status: 0 })
+  assert.equal(f.messages.size, 1)
+  assert.equal(f.messages.get(1).status, 1)
+  assert.equal(f.messages.get(1).fileSize, 640)
+  assert.equal(f.messages.get(1).messageType, 5)
+  assert.equal(f.sessions.get('Upeer').noReadCount, 0)
+})
+
+test('finishing an older upload does not replace a newer conversation preview', async () => {
+  const f = fixture()
+  await f.sync({ ...message(5, 1), fileName: 'clip.mov', fileSize: 1000, fileType: 1, status: 0, sendTime: 1 })
+  await f.sync({ ...message(2, 2), messageContent: 'newest text', sendTime: 2 })
+  await f.sync({ ...message(6, 1), fileName: 'clip.mov', fileSize: 640, fileType: 1, status: 1, sendTime: 1 })
+  assert.equal(f.sessions.get('Upeer').lastMessage, 'newest text')
+  assert.equal(f.sessions.get('Upeer').lastReceiveTime, 2)
+  assert.equal(f.sessions.get('Upeer').noReadCount, 2)
+})

@@ -9,14 +9,29 @@ import {
   update
 } from './ADB'
 import store from '../store'
+import { mergeChatMessage } from '../../shared/chatMessageMerge.mjs'
+
+const pendingWrites = new Map()
+const persistMessage = (message, insertMissing = true) => {
+  const userId = store.getUserId()
+  const snapshot = { ...message }
+  const key = `${userId}:${snapshot.messageId}`
+  const pending = (pendingWrites.get(key) || Promise.resolve()).catch(() => {}).then(async () => {
+    const previous = await queryOne('SELECT * FROM chat_message WHERE user_id = ? AND message_id = ?', [userId, snapshot.messageId])
+    if (!previous && !insertMissing) return 0
+    return insertOrUpdate('chat_message', { ...mergeChatMessage(previous, snapshot), userId })
+  })
+  pendingWrites.set(key, pending)
+  const clean = () => { if (pendingWrites.get(key) === pending) pendingWrites.delete(key) }
+  pending.then(clean, clean)
+  return pending
+}
 
 /**
  * 存储单条消息
  */
 const saveMessage = (chatMessage) => {
-  chatMessage.userId = store.getUserId()
-  //console.log('this is chatMessageModel, chatMessage: ', chatMessage, '\n')
-  return insertOrUpdate('chat_message', chatMessage)
+  return persistMessage(chatMessage)
 }
 
 /**
@@ -75,8 +90,7 @@ const selectChatMessage = async (query) => {
  * 更新消息
  */
 const updateMessage = (data, paramData) => {
-  paramData.userId = store.getUserId()
-  return update('chat_message', data, paramData)
+  return persistMessage({ ...data, messageId: paramData.messageId }, false)
 }
 
 /**

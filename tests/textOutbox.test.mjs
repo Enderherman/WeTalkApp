@@ -5,7 +5,7 @@ import { createTextOutbox } from '../src/renderer/src/utils/textOutbox.mjs'
 function fixture(send, saved = new Map()) {
   const state = { items: [], online: false, ready: false }, sent = []
   let count = 0
-  const outbox = createTextOutbox({ state, storage: { load: async () => [...saved.values()].map((item) => ({ ...item })), put: async (item) => saved.set(item.clientMessageId, { ...item }), remove: async (id) => saved.delete(id) }, send, onSent: (message) => sent.push(message), id: () => `id-${++count}`, now: () => 1 })
+  const outbox = createTextOutbox({ state, userId: 'Uself', storage: { load: async () => [...saved.values()].map((item) => ({ ...item })), put: async (item) => saved.set(item.clientMessageId, { ...item }), remove: async (id) => saved.delete(id) }, send, onSent: (message) => sent.push(message), id: () => `id-${++count}`, now: () => 1 })
   return { outbox, state, saved, sent }
 }
 const draft = (messageContent) => ({ contactId: 'Upeer', sessionId: 's', messageContent })
@@ -69,5 +69,34 @@ test('reconnection replays transient failures with the same idempotency key', as
   await f.outbox.setOnline(false)
   failed = false; await f.outbox.setOnline(true)
   assert.deepEqual(ids, ['id-1', 'id-1'])
+  assert.equal(f.state.items.length, 0)
+})
+
+test('an own websocket echo removes the pending bubble before a late HTTP timeout without resurrecting it', async () => {
+  let rejectHttp
+  const gate = new Promise((resolve, reject) => { rejectHttp = reject })
+  const f = fixture(() => gate)
+  await f.outbox.load(); await f.outbox.enqueue(draft('accepted'))
+  const sending = f.outbox.setOnline(true)
+  const ack = f.outbox.acknowledge({ messageId: 8, messageType: 2, clientMessageId: 'id-1', sendUserId: 'Uself', contactId: 'Upeer', sessionId: 's' })
+  assert.equal(f.state.items.length, 0)
+  await ack
+  rejectHttp(new Error('HTTP acknowledgement lost'))
+  await sending
+  assert.equal(f.saved.size, 0)
+  assert.equal(f.state.items.length, 0)
+  assert.deepEqual(f.sent, [])
+})
+
+test('foreign or mismatched echoes cannot acknowledge a draft and an HTTP-first echo remains idempotent', async () => {
+  const f = fixture(async () => ({ messageId: 8 }))
+  await f.outbox.load(); await f.outbox.enqueue(draft('accepted'))
+  const echo = { messageId: 8, messageType: 2, clientMessageId: 'id-1', sendUserId: 'Uself', contactId: 'Upeer', sessionId: 's' }
+  assert.equal(await f.outbox.acknowledge({ ...echo, sendUserId: 'Uother' }), false)
+  assert.equal(await f.outbox.acknowledge({ ...echo, contactId: 'Uother' }), false)
+  assert.equal(f.saved.size, 1)
+  await f.outbox.setOnline(true)
+  assert.equal(await f.outbox.acknowledge(echo), false)
+  assert.equal(f.sent.length, 1)
   assert.equal(f.state.items.length, 0)
 })

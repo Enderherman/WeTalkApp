@@ -1,8 +1,10 @@
+import { mergeChatMessage } from '../../../shared/chatMessageMerge.mjs'
+
 export function mergeHistoryMessages(existing, incoming) {
   const byId = new Map(existing.map((message) => [message.messageId, message]))
   for (const message of incoming) {
     const previous = byId.get(message.messageId)
-    byId.set(message.messageId, { ...previous, ...message })
+    byId.set(message.messageId, mergeChatMessage(previous, message))
   }
   return [...byId.values()].sort((a, b) => a.messageId - b.messageId)
 }

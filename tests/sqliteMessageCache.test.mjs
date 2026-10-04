@@ -6,6 +6,7 @@ import path from 'node:path'
 import os from 'node:os'
 import Module, { createRequire } from 'node:module'
 import { build } from 'esbuild'
+import { createDesktopMessageSync } from '../src/main/utils/desktopMessageSync.mjs'
 
 for (const legacy of [false, true]) test(`real SQLite ${legacy ? 'legacy migration' : 'new cache'} preserves types, counts, remarks and cursors`, async () => {
   const directory = await mkdtemp(path.join(os.tmpdir(), 'wetalk-cache-test-'))
@@ -24,6 +25,7 @@ for (const legacy of [false, true]) test(`real SQLite ${legacy ? 'legacy migrati
       await new Promise((resolve, reject) => oldDatabase.exec(`
         CREATE TABLE chat_session_user(user_id varchar, contact_id varchar, contact_type integer, session_id varchar, status integer default 1, contact_name varchar, last_message varchar, last_receive_time bigint, no_read_count integer default 0, member_count integer, top_type integer default 0, PRIMARY KEY(user_id,contact_id));
         CREATE TABLE user_setting(user_id varchar PRIMARY KEY,email varchar,sys_setting varchar,contact_no_read integer,server integer);
+        CREATE TABLE chat_message(user_id varchar NOT NULL,message_id integer NOT NULL,session_id varchar,message_type integer,message_content varchar,contact_type integer,send_user_id varchar,send_user_nick_name varchar,send_time bigint,status integer,file_size bigint,file_name varchar,file_path varchar,file_type integer,PRIMARY KEY(user_id,message_id));
       `, (error) => error ? reject(error) : resolve()))
       await new Promise((resolve, reject) => oldDatabase.close((error) => error ? reject(error) : resolve()))
     }
@@ -83,6 +85,38 @@ for (const legacy of [false, true]) test(`real SQLite ${legacy ? 'legacy migrati
     await api.deleteChatSessionUser('Upeer')
     await api.saveOrUpdateChatSessionUserBatch4Init([{ contactId: 'Upeer', sessionId: 'session', lastMessage: 'new incoming', lastReceiveTime: 2 }])
     assert.equal((await api.selectChatSessionUser()).length, 1)
+    await api.saveMessage({ messageId: 77, sessionId: 'session', messageType: 5, status: 1, fileName: 'clip.mov', fileSize: 640, fileType: 1 })
+    await api.saveMessage({ messageId: 77, sessionId: 'session', messageType: 5, status: 0, fileName: 'clip.mov', fileSize: 1000, fileType: 1, filePath: '/original/clip.mov' })
+    const finalFile = await api.selectChatMessagesByMessageId(77)
+    assert.equal(finalFile.status, 1)
+    assert.equal(finalFile.fileSize, 640)
+    assert.equal(finalFile.filePath, '/original/clip.mov')
+    await api.updateMessage({ status: 2 }, { messageId: 77 })
+    assert.equal((await api.selectChatMessagesByMessageId(77)).status, 1)
+    await Promise.all([
+      api.saveMessage({ messageId: 78, clientMessageId: 'same-client-key', sessionId: 'session', messageType: 5, status: 1, fileSize: 640, fileName: 'clip.mov' }),
+      api.saveMessage({ messageId: 78, clientMessageId: 'same-client-key', sessionId: 'session', messageType: 5, status: 0, fileSize: 1000, fileName: 'clip.mov' }),
+    ])
+    const concurrentFile = await api.selectChatMessagesByMessageId(78)
+    assert.equal(concurrentFile.status, 1)
+    assert.equal(concurrentFile.fileSize, 640)
+    assert.equal(concurrentFile.clientMessageId, 'same-client-key')
+    assert.equal(await api.queryCount('SELECT count(*) FROM chat_message WHERE message_id = 78', []), 1)
+    const emitted = []
+    const unreadBeforeMirror = (await api.selectUserSessionByContactId('Upeer')).noReadCount
+    const sync = createDesktopMessageSync({
+      userId: () => 'Utest', currentSessionId: () => null,
+      findMessage: api.selectChatMessagesByMessageId, saveMessage: api.saveMessage,
+      findSession: api.selectUserSessionByContactId, saveSession: api.saveOrUpdateChatSessionByMessage,
+      emit: (message) => emitted.push(message)
+    })
+    const fileFrame = { messageId: 79, sessionId: 'session', contactId: 'Upeer', sendUserId: 'Utest', contactType: 0, fileName: 'voice.mp3', fileType: 1, messageContent: '[媒体]', sendTime: 3 }
+    await sync({ ...fileFrame, messageType: 6, fileSize: 400, status: 1 })
+    await sync({ ...fileFrame, messageType: 5, fileSize: 600, status: 0 })
+    assert.equal((await api.selectChatMessagesByMessageId(79)).fileSize, 400)
+    assert.equal((await api.selectChatMessagesByMessageId(79)).messageType, 5)
+    assert.equal((await api.selectUserSessionByContactId('Upeer')).noReadCount, unreadBeforeMirror)
+    assert.equal(emitted[0].fileSize, 400)
     await assert.rejects(api.queryAll('select * from missing_table', []), /no such table/)
   } finally {
     sqlite.Database = NativeDatabase

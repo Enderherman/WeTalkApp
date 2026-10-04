@@ -47,6 +47,10 @@ const createTable = async () => {
 
     // 创建索引
     const sessionColumns = await queryAll('pragma table_info(chat_session_user)', [])
+    const messageColumns = await queryAll('pragma table_info(chat_message)', [])
+    if (!messageColumns.some((item) => item.name === 'client_message_id')) {
+      await run('alter table chat_message add column client_message_id varchar', [])
+    }
     if (!sessionColumns.some((item) => item.name === 'remark')) {
       await run('alter table chat_session_user add column remark varchar(40)', [])
     }

@@ -1,5 +1,6 @@
-export function createTextOutbox({ state, storage, send, onSent, id = () => crypto.randomUUID(), now = Date.now }) {
+export function createTextOutbox({ state, storage, send, onSent, userId, id = () => crypto.randomUUID(), now = Date.now }) {
   let disposed = false, flushing = false
+  const acknowledged = new Set()
   async function flush() {
     if (disposed || flushing || !state.online) return
     flushing = true
@@ -17,18 +18,32 @@ export function createTextOutbox({ state, storage, send, onSent, id = () => cryp
           state.items = state.items.filter((draft) => draft.clientMessageId !== item.clientMessageId)
         } catch (error) {
           if (disposed) return
+          if (acknowledged.has(item.clientMessageId)) continue
           item.status = 'failed'
           item.retryable = Boolean(error.retryable)
           item.error = error.message || '消息发送失败，请重试'
           await storage.put({ ...item })
           // Preserve queue order: later drafts wait until this one is retried or discarded.
           break
-        }
+        } finally { acknowledged.delete(item.clientMessageId) }
       }
     } catch (error) { state.error = error.message || '无法保存待发消息状态' }
     finally { flushing = false }
   }
   return {
+    async acknowledge(message) {
+      if (disposed || message.sendUserId !== userId || Number(message.messageType) !== 2 || !Number.isSafeInteger(message.messageId)) return false
+      const item = state.items.find((draft) => draft.clientMessageId === message.clientMessageId && draft.contactId === message.contactId && draft.sessionId === message.sessionId)
+      if (!item) return false
+      acknowledged.add(item.clientMessageId)
+      // Remove the pending bubble in the same render tick as the authoritative
+      // echo; a later HTTP timeout must not resurrect the accepted draft.
+      state.items = state.items.filter((draft) => draft.clientMessageId !== item.clientMessageId)
+      try { await storage.remove(item.clientMessageId) }
+      catch (error) { if (!disposed) state.error = error.message || '已发送草稿缓存清理失败' }
+      if (!flushing) { acknowledged.delete(item.clientMessageId); void flush() }
+      return true
+    },
     async load() {
       const items = await storage.load()
       if (disposed) return

@@ -3,6 +3,7 @@ const add_table = [
   'create table if not exists chat_message(' +
     'user_id varchar not null,' +
     'message_id bigint not null default null,' +
+    'client_message_id varchar,' +
     'session_id varchar,' +
     'message_type integer,' +
     'message_content varchar,' +

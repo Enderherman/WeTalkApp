@@ -31,6 +31,7 @@
     "test:contact-applications": "node --test tests/contactApplicationPaging.test.mjs",
     "test:message-time": "node --test tests/messageTime.test.mjs",
     "test:ipc-security": "node --test tests/ipcSecurity.test.mjs",
+    "test:message-mirror": "node --test tests/desktopMessageSync.test.mjs tests/messageEchoMerge.test.mjs tests/textOutbox.test.mjs tests/sqliteMessageCache.test.mjs",
     "postinstall": "electron-builder install-app-deps",
     "build:win": "npm run build && electron-builder --win --config",
     "build:mac": "npm run build && electron-builder --mac --config",

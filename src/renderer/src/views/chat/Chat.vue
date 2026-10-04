@@ -299,6 +299,7 @@ const connectionState = ref('connecting')
 const outboxUserId = userInfoStore.getInfo().userId
 const outbox = createTextOutbox({
   state: outboxState,
+  userId: outboxUserId,
   storage: {
     load: () => window.ipcRenderer.invoke('textOutbox:load', { userId: outboxUserId }),
     put: (draft) => window.ipcRenderer.invoke('textOutbox:save', { userId: outboxUserId, draft: { ...draft } }),
@@ -315,7 +316,7 @@ const outbox = createTextOutbox({
     return result.data
   },
   onSent: async (message, draft) => {
-    const saved = { ...message, contactId: draft.contactId, sessionId: draft.sessionId }
+    const saved = { ...message, clientMessageId: message.clientMessageId || draft.clientMessageId, contactId: draft.contactId, sessionId: draft.sessionId }
     window.ipcRenderer.send('addChatMessage', saved)
     sendMessage4LocalHandler(saved)
   }
@@ -486,6 +487,7 @@ const receiveAiStreamMessage = (message) => {
 
 const onReceiveMessage = () => {
   ipc.on('receiveMessage', (event, message) => {
+    if (message.messageType === 2 && message.sendUserId === outboxUserId) void outbox.acknowledge(message)
     if (message.messageType === 18) {
       chatSessionList.value.forEach((item) => applyContactRemark(item, message.extentData))
       applyContactRemark(currentChatSession.value, message.extentData)
@@ -514,11 +516,13 @@ const onReceiveMessage = () => {
     }
     //媒体消息处理
     if (message.messageType === 6) {
-      const localMessage = messageList.value.find((item) => {
-        return item.messageId === message.messageId
-      })
-      if (localMessage) {
-        localMessage.status = 1
+      if (message.sessionId === currentChatSession.value.sessionId || messageList.value.some((item) => item.messageId === message.messageId)) {
+        messageList.value = mergeHistoryMessages(messageList.value, [message])
+        markVisibleMessagesRead()
+      }
+      if (message.extentData?.sessionId && !chatSessionList.value.some((item) => item.sessionId === message.extentData.sessionId)) {
+        chatSessionList.value.push(message.extentData)
+        sortChatSession(chatSessionList.value)
       }
       return
     }
@@ -577,13 +581,7 @@ const onReceiveMessage = () => {
       // } else {
       //   messageList.value.push(message)
       // }
-      const idx = messageList.value.findIndex((item) => item.messageId === message.messageId)
-      if (idx > -1) {
-        // 用新的 message 对象替换原来的位置
-        messageList.value.splice(idx, 1, message)
-      } else {
-        messageList.value.push(message)
-      }
+      messageList.value = mergeHistoryMessages(messageList.value, [message])
 
       // 确保滚动跟上
       scrollToBottom()
@@ -645,8 +643,7 @@ const onAddChatMessage = () => {
       return item.messageId === messageId
     })
     if (findMessage) {
-      findMessage.status = status
-      findMessage.uploadError = error
+      messageList.value = mergeHistoryMessages(messageList.value, [{ messageId, status, uploadError: error }])
     }
   })
 }
