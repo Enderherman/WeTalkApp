@@ -43,4 +43,4 @@
 
 `node --test tests/outgoingMedia.test.mjs tests/avatarCover.test.mjs tests/localMediaServer.test.mjs tests/cachedUploadFile.test.mjs tests/fileUpload.test.mjs` 共22项通过、无跳过；实际Chromium分支在设置 `WETALK_PLAYWRIGHT_PACKAGE` 与 `PLAYWRIGHT_BROWSERS_PATH` 后执行。`WETALK_HEVC_EVIDENCE_DIR` 可选指定生成证据的目录。`npm run build` 验证main/preload/renderer。
 
-既有NSIS安装器 `f48147f0…` 只对应源码 `3ff96f9`，不包含本次视频处理与账号隔离修改。最终安装包应在后续代码收敛后重新构建并记录新哈希；本轮没有运行或安装旧包。
+首轮NSIS安装器 `f48147f0…` 只对应源码 `3ff96f9`；后续已基于包含本次修改及最终metadata合并的 `a5f96bd` 重建测试包，SHA-256为 `e04d0d72fc806e7f04f84b338d0fd6ed219f4d1ce29032eafd42408069319c0e`。两个源码快照的稳定副本均保留，详见 `windows-package-verification.md`；安装器与打包应用主程序均未运行。

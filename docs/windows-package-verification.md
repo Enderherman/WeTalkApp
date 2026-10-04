@@ -1,8 +1,8 @@
 # Windows NSIS 安装包构建验收
 
-日期：2026-10-04。源码提交：`3ff96f92d7e82d34c394b245a21abeb14b1a5d82`，构建开始时与 `origin/master` 一致、工作区干净。
+日期：2026-10-04。最新测试包源码提交：`a5f96bdbc448b7bd25903370fb0bd5a53e6b94f7`，构建开始时与 `origin/master` 一致、工作区干净。
 
-**后续代码已增加HEVC处理和处理中账号隔离修复；本页安装器仍仅对应上面的旧源码，不代表最新HEAD。新代码收敛后的最终包需重新构建并另记哈希。** 视频链路的新验收见 `hevc-processing-verification.md`。
+本次已在HEVC处理、账号隔离及同账号多端最终消息metadata合并后重建安装包；首轮 `3ff96f9` 旧包稳定副本仍保留。此包只代表上面明确的源码快照，后续代码更改需另行复验，不能把本页哈希自动视为后续HEAD的产物。视频链路验收见 `hevc-processing-verification.md`。
 
 本次完成完整 NSIS 安装包构建和静态资源/字节验证。**没有运行安装器、安装应用、打开打包后的 WeTalkApp.exe、发布 Release 或部署 NAS。** 这是仓库默认本机目标的构建验收产物；正式域名及 NAS 发布入口仍留待整体功能完成后确定。
 
@@ -27,6 +27,7 @@
 - WebSocket：`ws://127.0.0.1:5051/ws`，来源为 renderer API 配置的回退值，交给主进程连接。
 - 打包版 renderer 仍由只绑定 loopback 的临时本地页面服务提供，`/api` 代理到上述 API 地址。
 - 从实际安装器提取 `resources/app.asar` 后，检查了编译后的 main/renderer：默认 API/WS 字面值存在，私有 QA `15060` 一组 origin 不存在；隔离 preload 和 `contextIsolation: true` 仍在包内。
+- 编译后关键代码还确认包含 `createTrustedIpcMain`、`createRestrictedIpc`、被实际调用的 `createMediaProcessors` / `processOutgoingMedia`、H.264兼容的 `yuv420p`、最终消息metadata的 `mergeChatMessage`。
 
 使用的命令窗口设置仅作用于本次命令，没有修改系统环境或源码默认值：
 
@@ -45,13 +46,15 @@ main/preload/renderer 构建、NSIS 构建、blockmap 生成均成功，最终�
 
 | 文件 | 大小（字节） | SHA-256 |
 |---|---:|---|
-| `WeTalkAppSetup.1.0.0.exe` | 200902142 | `f48147f00c11fc393b13184f795ab6118485c82ce424926bb47d5d49079ac656` |
-| `WeTalkAppSetup.1.0.0.exe.blockmap` | 207894 | `33ca690b9191e62bd1a7340d90e27125cade26e182f17e2aaeb67adc42c69d09` |
-| `latest.yml` | 345 | `7dfaa9e76f30f8be6dab635eec608ce11b6ea8f198fd9d3a8a7773b373156189` |
+| `WeTalkAppSetup.1.0.0.exe` | 200913887 | `e04d0d72fc806e7f04f84b338d0fd6ed219f4d1ce29032eafd42408069319c0e` |
+| `WeTalkAppSetup.1.0.0.exe.blockmap` | 208385 | `8f0dcb3a1d2ee33fa6ce7989f04313c7a1bb637cb134d46cfc24e277d7b91e09` |
+| `latest.yml` | 345 | `215d83be0a80ff6c870db73eff39d46d33077345db38546c47aa306ba367cb65` |
 
-安装器约 191.60 MiB。`latest.yml` 的文件名、大小与 SHA-512 已按实际安装器重算并逐项一致；生成该本地元数据不等于发布更新。
+安装器约 191.61 MiB。`latest.yml` 的文件名、大小与 SHA-512 已按实际安装器重算并逐项一致；生成该本地元数据不等于发布更新。
 
-为避免后续构建覆盖，本次安装器另保存为 `D:/environment/WeTalkParityQA/20261004/nsis-verification/WeTalkAppSetup.1.0.0-default-local-3ff96f9.exe`。完整验证结果为同目录 `verification.json`，检查脚本为 `verify-package.cjs`。
+为避免后续构建覆盖，本次安装器另保存为 `D:/environment/WeTalkParityQA/20261004/nsis-verification/WeTalkAppSetup.1.0.0-default-local-a5f96bd.exe`，并保留同名blockmap与 `latest-a5f96bd.yml`。完整验证结果为同目录 `verification-a5f96bd.json`，检查脚本为 `verify-package-a5f96bd.cjs`。
+
+首轮稳定副本 `WeTalkAppSetup.1.0.0-default-local-3ff96f9.exe` 保持原样；重建前重新核对其SHA-256仍为 `f48147f00c11fc393b13184f795ab6118485c82ce424926bb47d5d49079ac656`，大小200902142字节。旧 `verification.json` / `verify-package.cjs` 也保留，不能与a5结果混用。
 
 ## 实际安装器内资源验证
 
@@ -61,7 +64,7 @@ main/preload/renderer 构建、NSIS 构建、blockmap 生成均成功，最终�
 
 | 安装器内相对路径 | 大小（字节） | SHA-256 |
 |---|---:|---|
-| `resources/app.asar` | 97781101 | `e440aa54f8f564335c22e49fe8c9472f333b2745d965e39251911b6ee0864e3e` |
+| `resources/app.asar` | 97828676 | `c90e1a32b3311cb84122d4abf549132fd059ac765cbc01ade7c45837571507d0` |
 | `resources/app.asar.unpacked/node_modules/sqlite3/lib/binding/napi-v6-win32-unknown-x64/node_sqlite3.node` | 1851904 | `7fb52b781709b065c240b6b81394be6e72e53fe11d7c8e0f7b49dd417eb78a01` |
 | `resources/app.asar.unpacked/node_modules/ffmpeg-static/ffmpeg.exe` | 81114624 | `e9fd5e711debab9d680955fc1e38a2c1160fd280b144476cc3f62bc43ef49db1` |
 | `resources/app.asar.unpacked/node_modules/ffprobe-static/bin/win32/x64/ffprobe.exe` | 63059968 | `4303ec85855340689b1f8aa5d9c1dc06ef3e3090682de3034edc3fca2b0798d5` |
@@ -69,6 +72,8 @@ main/preload/renderer 构建、NSIS 构建、blockmap 生成均成功，最终�
 
 默认头像还与源码 `assets/default_avatar.png` 字节一致。ASAR 内未嵌套旧 `installPackages` 目录。
 
-资源可用性另作独立检查：从安装器提取的 sqlite N-API 模块在 Node 24 中打开内存库，`SELECT 42 AS answer` 返回 42；提取的 ffmpeg 6.0 生成 16×16 PNG，提取的 ffprobe 4.0.2 读回 `codec_name=png, width=16, height=16`。仅执行了这些媒体/数据库组件验证，没有启动安装器或应用主程序。
+包内主进程 `out/main/index.js` SHA-256为 `1cc63f4eeb5f63575333817577513d5c32f643081cb4e072e423a3e7c61e365c`；preload为 `4a486c59db940ddb1895b5684bcbb778838dc3e9feb944bbf52e452311996dac`。
+
+本轮仅静态提取、检查JS及对比哈希，没有运行安装器、应用主程序或提取出的原生/媒体组件。四项资源哈希与首轮实际运行验证过的组件完全一致；首轮记录为sqlite内存库 `SELECT 42 AS answer` 返回42，以及ffmpeg 6.0生成/ffprobe 4.0.2读回16×16 PNG。这些旧组件运行记录与本轮静态包检验分别保留，不冒称重新启动过它们。
 
 本轮未发现当前 NSIS 产物缺失所需资源的打包缺陷，因此未修改产品代码、服务器默认值或打包身份。安装向导、覆盖安装/卸载及真实用户运行验收不属于本次未安装检查的证据范围。
