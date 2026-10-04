@@ -27,3 +27,9 @@
 - `electron-builder.yml` 显式将 ffmpeg/ffprobe 放进 `app.asar.unpacked`；运行时将 `.asar` 路径转换到 `.asar.unpacked`，供 ffmpeg 的进程调用使用。
 - `node --test tests/avatarCover.test.mjs` 5项通过且无跳过，包含真实已安装 ffmpeg 的 PNG/缩略图转换、并发隔离、账号切换、失败清理和打包路径。
 - `electron-builder --win --dir --config electron-builder.yml --publish never` 成功，产物位于 `D:/environment/WeTalkParityQA/20261004/media-package/win-unpacked`。实际产物中的 ffmpeg 6.0、ffprobe 4.0.2 可启动；用产物 ffmpeg 生成16×16 PNG、产物 ffprobe读回 codec_name=png、width=16、height=16。此步骤未运行安装程序、未发布或部署。
+
+## 上传保留原文件名
+
+缓存仍以消息编号命名，但 multipart 的 `filename` 从已保存消息的原始 `fileName` 取得，MIME 也显式按原名计算；避免 `100.txt` 等缓存名覆盖用户的文件名。FormData 默认优先用流的路径推断 MIME，因此只设置 filename 不足以覆盖缓存路径后缀，现已同时设置 contentType。
+
+真实本地 multipart HTTP 测试验证中文文本名、PNG和WAV原名/MIME/文件体均一致，并拒绝文件名中的头部控制字符。连同头像转换、媒体服务和上传状态共17项通过，桌面构建通过。真实后端/桌面刷新后名称与下载字节由集成验收再次检查。

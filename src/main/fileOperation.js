@@ -17,6 +17,7 @@ import { downloadMediaToCache } from './utils/mediaDownload.mjs'
 import { getDesktopRendererOrigin } from './utils/desktopRendererOrigin'
 import { createAvatarCover } from './utils/avatarCover.mjs'
 import { mediaExecutablePath } from './utils/mediaExecutable.mjs'
+import { appendCachedUploadFile } from './utils/cachedUploadFile.mjs'
 
 // 引入 ffmpeg 相关包
 const ffmpeg = require('fluent-ffmpeg')
@@ -40,6 +41,8 @@ const image_suffix = '.png'
 const saveFileToLocal = async (messageId, filePath, fileType) => {
   const token = store.getUserData('token')
   try {
+    const messageInfo = await selectChatMessagesByMessageId(messageId)
+    if (!messageInfo?.fileName) throw new Error('无法读取文件消息原始名称')
     // 获取保存路径
     let savePath = await getLocalFilePath('chat', false, messageId)
     savePath = path.normalize(savePath)
@@ -70,7 +73,7 @@ const saveFileToLocal = async (messageId, filePath, fileType) => {
       }
     }
     // 上传文件
-    await uploadFile(messageId, savePath, coverPath, token)
+    await uploadFile(messageId, savePath, coverPath, token, messageInfo.fileName)
   } catch (error) {
     console.error('保存文件失败:', error)
     throw error
@@ -165,10 +168,10 @@ const generateThumbnail = (inputPath, outputPath) => {
 /**
  * 上传文件
  */
-const uploadFile = (messageId, savePath, coverPath, token) => {
+const uploadFile = (messageId, savePath, coverPath, token, originalName) => {
   const formData = new FormData()
   formData.append('messageId', messageId)
-  formData.append('file', fs.createReadStream(savePath))
+  appendCachedUploadFile(formData, savePath, originalName)
   if (coverPath) {
     formData.append('cover', fs.createReadStream(coverPath))
   }
