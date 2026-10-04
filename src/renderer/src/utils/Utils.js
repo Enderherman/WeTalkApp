@@ -34,8 +34,7 @@ const getAreaInfo = (data) => {
 
 const formatDate = (timestamp) => {
   const timestampTime = moment(timestamp)
-  const days =
-    Number.parseInt(moment().format('YYYYMMDD')) - Number.parseInt(timestampTime.format('YYYYMMDD'))
+  const days = moment().startOf('day').diff(timestampTime.clone().startOf('day'), 'days')
   if (days === 0) {
     return timestampTime.format('HH:mm')
   } else if (days === 1) {
@@ -47,6 +46,7 @@ const formatDate = (timestamp) => {
     //显示年月日
     return timestampTime.format('YY/MM/DD')
   }
+  return timestampTime.format('HH:mm')
 }
 
 const sizeToStr = (limit) => {

@@ -68,9 +68,8 @@
             <!--展示时间-->
             <template
               v-if="
-                index > 1 &&
-                data.sendTime - messageList[index - 1].sendTime >= 300000 &&
-                (data.messageType === 2 || data.messageType === 5)
+                shouldShowMessageTime(data, messageList[index - 1]) &&
+                (data.messageType === 2 || data.messageType === 5 || data.messageType === 14)
               "
             >
               <ChatMessageTime :data="data" />
@@ -199,6 +198,7 @@ import { createAiStopper } from '@/utils/aiMessages.mjs'
 import { createTextOutbox } from '@/utils/textOutbox.mjs'
 import Message from '@/plugin/Message'
 import { createHistorySearch } from '@/utils/historySearch.mjs'
+import { shouldShowMessageTime } from '@/utils/messageTime.mjs'
 
 const route = useRoute()
 const userInfoStore = useUserInfoStore()

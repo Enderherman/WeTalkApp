@@ -6,8 +6,7 @@
         <div class="more-op">
           <el-dropdown placement="bottom-end" trigger="click">
             <span class="el-dropdown-link">
-              <!--TODO 此处不允许使用元素 div-->
-              <div class="iconfont icon-more"></div>
+              <span class="iconfont icon-more"></span>
             </span>
             <template #dropdown>
               <el-dropdown-menu>

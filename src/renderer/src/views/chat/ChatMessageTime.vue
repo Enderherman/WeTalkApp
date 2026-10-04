@@ -1,10 +1,10 @@
 <template>
   <div class="message-time">
-    {{ Utils.formatDate(data.sendTime) }}
+    {{ formatMessageTime(data.sendTime) }}
   </div>
 </template>
 <script setup>
-import Utils from '../../utils/Utils'
+import { formatMessageTime } from '@/utils/messageTime.mjs'
 
 const props = defineProps({
   data: {
@@ -18,7 +18,7 @@ const props = defineProps({
 .message-time {
   background: #dadada;
   display: inline-block;
-  color: #fff;
+  color: #4b5563;
   font-size: 12px;
   padding: 2px 5px;
   border-radius: 3px;
