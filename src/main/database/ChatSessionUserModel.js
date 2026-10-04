@@ -228,10 +228,12 @@ const updatePeerReadMessageId = (message) => {
 }
 
 const updateContactRemark = (contactId, remark) => update('chat_session_user', { remark }, { userId: store.getUserId(), contactId })
+const updateReadCursor = (contactId, messageId) => run('UPDATE chat_session_user SET last_read_message_id = MAX(COALESCE(last_read_message_id,0), ?), no_read_count = 0 WHERE user_id = ? AND contact_id = ?', [messageId, store.getUserId(), contactId])
 
 export {
   updatePeerReadMessageId,
   updateContactRemark,
+  updateReadCursor,
   saveOrUpdateChatSessionUserBatch4Init,
   updateNoReadCount,
   clearNoReadCount,

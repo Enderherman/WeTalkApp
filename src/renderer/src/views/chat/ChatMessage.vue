@@ -26,6 +26,7 @@
           </template>
         </div>
       </template>
+      <div v-if="data.contactType === 0 && data.messageId <= (currentChatSession.peerReadMessageId || 0)" class="read-receipt">已读</div>
     </div>
     <Avatar :width="35" :user-id="userInfoStore.getInfo().userId"></Avatar>
   </div>
@@ -79,7 +80,7 @@ const props = defineProps({
     type: Object,
     default: {}
   },
-  currentSession: {
+  currentChatSession: {
     type: Object,
     default: {}
   }
@@ -94,6 +95,7 @@ const showDetail = () => {
 </script>
 
 <style scoped lang="less">
+.read-receipt { color: #667085; font-size: 12px; margin-top: 4px; }
 .sending {
   width: 170px;
   height: 170px;

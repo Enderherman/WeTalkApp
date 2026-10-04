@@ -125,7 +125,7 @@ import ChatMessageTime from '@/views/chat/ChatMessageTime.vue'
 import ChatMessage from '@/views/chat/ChatMessage.vue'
 import ChatSession from '@/views/chat/ChatSession.vue'
 import MessageSend from '@/views/chat/MessageSend.vue'
-import { nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
+import { nextTick, onMounted, onUnmounted, onActivated, onDeactivated, reactive, ref, watch } from 'vue'
 import ContextMenu from '@imengyu/vue3-context-menu'
 import '@imengyu/vue3-context-menu/lib/vue3-context-menu.css'
 import Confirm from '@/utils/Confirm'
@@ -142,6 +142,7 @@ import Request from '@/utils/Request'
 import Api from '@/utils/Api'
 import { createHistoryPager, mergeHistoryMessages } from '@/utils/historyPaging.mjs'
 import { useUserInfoStore } from '@/stores/UserInfoStore'
+import { createReadCursorWriter, canMarkVisibleSession } from '@/utils/readCursor.mjs'
 
 const route = useRoute()
 const userInfoStore = useUserInfoStore()
@@ -185,6 +186,26 @@ let distanceToBottom = 0
 const currentChatSession = ref({})
 //消息列表
 const messageList = ref([])
+let chatActive = true
+const readWriter = createReadCursorWriter({
+  send: async (contactId, messageId) => Boolean(await Request({ url: Api.markRead, params: { contactId, messageId }, showLoading: false, showError: false })),
+  onConfirmed: async (contactId, messageId) => {
+    await window.ipcRenderer.invoke('saveReadCursor', { userId: userInfoStore.getInfo().userId, contactId, messageId })
+    const session = chatSessionList.value.find((item) => item.contactId === contactId)
+    if (session) { session.lastReadMessageId = Math.max(session.lastReadMessageId || 0, messageId); session.noReadCount = 0 }
+    messageCountStore.setCount('chatCount', chatSessionList.value.reduce((count, item) => count + (item.noReadCount || 0), 0), true)
+  }
+})
+const markVisibleMessagesRead = () => {
+  if (!canMarkVisibleSession({ active: chatActive, visible: document.visibilityState !== 'hidden', focused: document.hasFocus(), contactId: currentChatSession.value.contactId })) return
+  const latest = messageList.value.reduce((id, message) => Math.max(id, Number(message.messageId) || 0), 0)
+  void readWriter.mark(currentChatSession.value.contactId, latest)
+}
+const syncVisibleSession = () => {
+  const visible = canMarkVisibleSession({ active: chatActive, visible: document.visibilityState !== 'hidden', focused: document.hasFocus(), contactId: currentChatSession.value.contactId })
+  setSessionSelect(visible ? currentChatSession.value : {})
+  if (visible) { markVisibleMessagesRead(); void readWriter.retry() }
+}
 const historyState = reactive({ contactId: null, loading: false, hasMore: true, error: '', loaded: false, cursor: null })
 const historyPager = createHistoryPager({
   state: historyState,
@@ -198,6 +219,7 @@ const historyPager = createHistoryPager({
     const cached = await window.ipcRenderer.invoke('cacheChatHistory', { userId: userInfoStore.getInfo().userId, messages })
     if (!cached || !isCurrent() || currentChatSession.value.contactId !== contactId || currentChatSession.value.sessionId !== sessionId) return
     messageList.value = mergeHistoryMessages(messageList.value, messages)
+    markVisibleMessagesRead()
     if (!append) scrollToBottom()
     else if (firstId) nextTick(() => document.getElementById('message' + firstId)?.scrollIntoView())
   },
@@ -315,6 +337,7 @@ const onReceiveMessage = () => {
     if (message.messageType === 0) {
       loadChatSession()
       loadContactApply()
+      void readWriter.retry()
       return
     }
     if (message.messageType === 17) {
@@ -380,8 +403,9 @@ const onReceiveMessage = () => {
       Object.assign(currentSession, message.extentData)
     }
     sortChatSession(chatSessionList.value)
+    messageCountStore.setCount('chatCount', chatSessionList.value.reduce((count, item) => count + (item.noReadCount || 0), 0), true)
     if (message.sessionId !== currentChatSession.value.sessionId) {
-      if (message.incrementUnread !== false) messageCountStore.setCount('chatCount', 1, false)
+      return
     } else {
       // console.log('信息', message, '\n')
       // console.log('列表', messageList.value)
@@ -404,6 +428,7 @@ const onReceiveMessage = () => {
 
       // 确保滚动跟上
       scrollToBottom()
+      markVisibleMessagesRead()
     }
   })
 }
@@ -438,6 +463,7 @@ const onLoadChatMessage = () => {
     })
     const lastMessage = messageList.value[0]
     messageList.value = mergeHistoryMessages(messageList.value, dataList)
+    markVisibleMessagesRead()
     messagePageInfo.pageNo = pageNo
     messagePageInfo.pageTotal = pageTotal
     if (pageNo === 1) {
@@ -526,6 +552,9 @@ const onReloadChatSession = () => {
 }
 
 onMounted(() => {
+  window.addEventListener('focus', syncVisibleSession)
+  window.addEventListener('blur', syncVisibleSession)
+  document.addEventListener('visibilitychange', syncVisibleSession)
   onLoadContactApply()
 
   onReceiveMessage()
@@ -561,6 +590,10 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  readWriter.dispose()
+  window.removeEventListener('focus', syncVisibleSession)
+  window.removeEventListener('blur', syncVisibleSession)
+  document.removeEventListener('visibilitychange', syncVisibleSession)
   historyPager.dispose()
   window.ipcRenderer.removeAllListeners('receiveMessage')
   window.ipcRenderer.removeAllListeners('loadChatSessionCallback')
@@ -568,6 +601,15 @@ onUnmounted(() => {
   window.ipcRenderer.removeAllListeners('addChatMessageCallback')
   window.ipcRenderer.removeAllListeners('loadContactApplyCallback')
   window.ipcRenderer.removeAllListeners('reloadChatSessionCallback')
+})
+
+onActivated(() => {
+  chatActive = true
+  syncVisibleSession()
+})
+onDeactivated(() => {
+  chatActive = false
+  setSessionSelect({})
 })
 
 //置顶

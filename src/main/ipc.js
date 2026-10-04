@@ -14,7 +14,8 @@ import {
   selectChatSessionUser,
   topChatSessionUser,
   updateChatSessionByChatMessage,
-  updateChatSessionStatus
+  updateChatSessionStatus,
+  updateReadCursor
 } from './database/ChatSessionUserModel'
 import { saveMessage, saveMessageBatch, selectChatMessage, updateMessage } from './database/ChatMessageModel'
 import {
@@ -128,6 +129,11 @@ const onLoadChatMessage = () => {
  * 更新当前会话信息
  */
 const onSetSessionSelect = () => {
+  ipcMain.handle('saveReadCursor', async (e, { userId, contactId, messageId }) => {
+    if (userId !== store.getUserId() || !Number.isSafeInteger(messageId) || messageId <= 0) return false
+    await updateReadCursor(contactId, messageId)
+    return true
+  })
   ipcMain.on('setSessionSelect', (e, { contactId, sessionId }) => {
     if (sessionId) {
       store.setUserData('currentSessionId', sessionId)
