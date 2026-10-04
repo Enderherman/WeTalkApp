@@ -29,7 +29,7 @@
         </template>
       </el-popover>
       <el-upload
-        ref="uploadRef"
+        ref="uploadFileRef"
         name="file"
         :show-file-list="false"
         :multiple="true"
@@ -258,9 +258,8 @@ const addContact = (contactId, code) => {
  */
 const checkFileSize = (fileType, fileSize, fileName) => {
   const SIZE_MB = 1024 * 1024
-  const settingArray = Object.values(sysSettingStore.getSetting())
-  console.log(settingArray)
-  const fileSizeLimit = settingArray[fileType + 2]
+  const settings = sysSettingStore.getSetting()
+  const fileSizeLimit = settings[fileType === 0 ? 'maxImageSize' : fileType === 1 ? 'maxVideoSize' : 'maxFileSize']
   if (fileSize > fileSizeLimit * SIZE_MB) {
     Confirm({
       message: `文件 ${fileName} 超出 ${fileSizeLimit} MB限制`,

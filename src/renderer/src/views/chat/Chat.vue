@@ -88,6 +88,7 @@
                 :data="data"
                 :current-chat-session="currentChatSession"
                 @show-media-detail="showMediaDetailHandler"
+                @retry-message="retryFileMessage"
               ></ChatMessage>
             </template>
           </div>
@@ -415,14 +416,22 @@ const onLoadChatMessage = () => {
 }
 
 const onAddChatMessage = () => {
-  window.ipcRenderer.on('addChatMessageCallback', (event, { status, messageId }) => {
+  window.ipcRenderer.on('addChatMessageCallback', (event, { status, messageId, error }) => {
     const findMessage = messageList.value.find((item) => {
       return item.messageId === messageId
     })
     if (findMessage) {
       findMessage.status = status
+      findMessage.uploadError = error
     }
   })
+}
+
+const retryFileMessage = (message) => {
+  if (message.status !== 2 || !message.filePath) return
+  message.status = 0
+  message.uploadError = null
+  window.ipcRenderer.send('addChatMessage', { ...message })
 }
 
 /**

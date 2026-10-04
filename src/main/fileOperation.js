@@ -12,6 +12,7 @@ import store from './store'
 import { dialog } from 'electron'
 import { selectSettingInfo, updateSysSetting } from './database/UserSettingModel'
 import { getWindow } from './windowProxy'
+import { uploadFileRequest } from './utils/fileUpload.mjs'
 
 // 引入 ffmpeg 相关包
 const ffmpeg = require('fluent-ffmpeg')
@@ -40,6 +41,7 @@ const image_suffix = '.png'
  * @returns {Promise<void>}
  */
 const saveFileToLocal = async (messageId, filePath, fileType) => {
+  const token = store.getUserData('token')
   try {
     // 获取保存路径
     let savePath = await getLocalFilePath('chat', false, messageId)
@@ -64,11 +66,14 @@ const saveFileToLocal = async (messageId, filePath, fileType) => {
       }
 
       // 3.生成缩略图
-      coverPath = savePath + cover_image_suffix
-      await generateThumbnail(savePath, coverPath)
+      // Audio has no video stream; lack of a thumbnail must not reject it.
+      if (codecInfo) {
+        coverPath = savePath + cover_image_suffix
+        await generateThumbnail(savePath, coverPath)
+      }
     }
     // 上传文件
-    await uploadFile(messageId, savePath, coverPath)
+    await uploadFile(messageId, savePath, coverPath, token)
   } catch (error) {
     console.error('保存文件失败:', error)
     throw error
@@ -163,7 +168,7 @@ const generateThumbnail = (inputPath, outputPath) => {
 /**
  * 上传文件
  */
-const uploadFile = (messageId, savePath, coverPath) => {
+const uploadFile = (messageId, savePath, coverPath, token) => {
   const formData = new FormData()
   formData.append('messageId', messageId)
   formData.append('file', fs.createReadStream(savePath))
@@ -171,16 +176,7 @@ const uploadFile = (messageId, savePath, coverPath) => {
     formData.append('cover', fs.createReadStream(coverPath))
   }
   const url = `${getDomainPath()}/api/chat/uploadFile`
-  const token = store.getUserData('token')
-  const config = { headers: { 'Content-Type': 'multipart/form-data', token: token } }
-  axios
-    .post(url, formData, config)
-    .then((response) => {
-      console.log(response.data)
-    })
-    .catch((error) => {
-      console.error('文件上传失败', error)
-    })
+  return uploadFileRequest(url, formData, token)
 }
 
 /**

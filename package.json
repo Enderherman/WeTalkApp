@@ -14,6 +14,7 @@
     "test:api-proxy": "node --test tests/desktopApiServer.test.mjs",
     "test:sqlite-binding": "node --test tests/sqliteBinding.test.mjs",
     "test:realtime": "node --test tests/realtimeClient.test.mjs tests/desktopMessageSync.test.mjs",
+    "test:file-upload": "node --test tests/fileUpload.test.mjs",
     "postinstall": "electron-builder install-app-deps",
     "build:win": "npm run build && electron-builder --win --config",
     "build:mac": "npm run build && electron-builder --mac --config",

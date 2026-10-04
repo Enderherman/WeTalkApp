@@ -32,6 +32,7 @@ import icon from '../../resources/icon.png?asset'
 import { join } from 'path'
 import { is } from '@electron-toolkit/utils'
 import { download } from 'node-gyp/lib/download'
+import { persistOutgoingFile } from './utils/fileUpload.mjs'
 
 const NODE_ENV = process.env.NODE_ENV
 
@@ -134,25 +135,20 @@ const onSetSessionSelect = () => {
  */
 const onAddChatMessage = () => {
   ipcMain.on('addChatMessage', async (e, data) => {
-    console.log('addChatMessage', data)
-    //存储消息
-    await saveMessage(data)
-    //保存文件
+    const userId = store.getUserId()
     if (data.messageType === 5) {
-      console.log('存本地信息:', data.messageId, data.filePath, data.fileType)
-      await saveFileToLocal(data.messageId, data.filePath, data.fileType)
-
-      const updateInfo = { status: 1 }
-      await updateMessage(updateInfo, { messageId: data.messageId })
+      await persistOutgoingFile({
+        message: data, save: saveMessage, upload: saveFileToLocal, update: updateMessage,
+        isActive: () => userId === store.getUserId(),
+        notify: (result) => { if (!e.sender.isDestroyed()) e.sender.send('addChatMessageCallback', result) }
+      })
+    } else {
+      await saveMessage(data)
+      e.sender.send('addChatMessageCallback', { status: 1, messageId: data.messageId })
     }
-
-    // 更新session
+    if (userId !== store.getUserId()) return
     data.lastReceiveTime = data.sendTime
-    //更新会话
-    console.log('database,before update:', data, '\ncurTime:', new Date().getTime())
-    await updateChatSessionByChatMessage(store.getUserData('currentSessionId'), data)
-    //文件消息操作
-    e.sender.send('addChatMessageCallback', { status: 1, messageId: data.messageId })
+    await updateChatSessionByChatMessage(store.getUserData('currentSessionId'), data, { incrementUnread: false })
   })
 }
 

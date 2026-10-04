@@ -1,7 +1,11 @@
 <template>
   <div v-if="data.sendUserId === userInfoStore.getInfo().userId" class="message-content-my">
     <div :class="['content-panel', data.messageType === 5 ? 'content-panel-media' : '']">
-      <div v-if="data.status === 0" class="sending">
+      <div v-if="data.messageType === 5 && data.status === 2" class="upload-error" role="alert">
+        {{ data.uploadError || '上传失败，请重试' }}
+        <button type="button" @click="emit('retryMessage', data)">重新上传</button>
+      </div>
+      <div v-else-if="data.status === 0" class="sending">
         <el-skeleton :animated="true">
           <template #template>
             <el-skeleton-item class="skeleton-item" variant="image" />
@@ -79,7 +83,7 @@ const props = defineProps({
     default: {}
   }
 })
-const emit = defineEmits(['showMediaDetail'])
+const emit = defineEmits(['showMediaDetail', 'retryMessage'])
 const showDetail = () => {
   if (props.data.status === 0) {
     return
